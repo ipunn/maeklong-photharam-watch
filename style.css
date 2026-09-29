@@ -898,14 +898,15 @@ h1 {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
-  border: 1.5px solid var(--accent);
-  color: var(--accent);
+  border: 1.5px solid var(--text-dim);
+  color: var(--text-dim);
   font-weight: 600;
   font-size: 0.85rem;
 }
 .bank-pill[data-side="above"],
 .bank-pill[data-side="at"] {
-  background: var(--accent);
+  background: var(--text);
+  border-color: var(--text);
   color: #fff;
 }
 .bank-bar {
@@ -919,7 +920,7 @@ h1 {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 4px;
-  background: var(--accent);
+  background: var(--text-dim);
   opacity: 0.35;
 }
 .bank-tick {
@@ -937,7 +938,7 @@ h1 {
   height: 12px;
   margin: -6px 0 0 -6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--text-dim);
   border: 2px solid var(--card-bg);
   box-sizing: border-box;
 }
