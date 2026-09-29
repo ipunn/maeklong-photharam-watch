@@ -979,3 +979,11 @@ h1 {
   padding: 8px 12px;
   margin-bottom: 10px;
 }
+
+/* A subtle, permanent remark: no box, no colour, just small grey text. */
+.remark {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin: -6px 0 10px;
+}

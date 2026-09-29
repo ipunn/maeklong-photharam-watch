@@ -217,7 +217,8 @@
     const alertBanner = alerting.length
       ? `<div class="alert-banner" role="alert">⚠ ระดับน้ำสูงกว่าตลิ่งเกิน ${ALERT_MARGIN_M} ม.: ${alerting.join(" · ")}<div class="unit">${ALERT_NOTE} · โปรดติดตามประกาศทางการ</div></div>`
       : "";
-    document.getElementById("here").innerHTML = `${alertBanner}<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">พื้นที่ บางกรวย, บางคูเวียง จ.นนทบุรี</span></h2>
+    document.getElementById("here").innerHTML = `${alertBanner}<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">บางกรวย · บางคูเวียง</span></h2>
+      <div class="remark">คลองบางค้อไม่มีจุดวัด · แสดงจุดวัดใกล้เคียงเป็นข้อมูลอ้างอิง ไม่ใช่ระดับน้ำในคลองโดยตรง</div>
       <ul class="here-grid">${nodeHtml(hereStation, data.get(HERE_ID))}</ul>
       <div class="here-summary">
         <div><b>สัญญาณจากแม่น้ำเจ้าพระยา</b> — ${c13 && typeof c13.dischargeM3s === "number" ? `อัตราการไหลท้ายเขื่อนเจ้าพระยา ≈ ${c13.dischargeM3s.toLocaleString("en")} ลบ.ม./วินาที` : "ไม่มีข้อมูลอัตราการไหลท้ายเขื่อนเจ้าพระยา"}${staleCount ? ` · <span class="health-warn">${STALE_TEXT} ${staleCount} จุด</span>` : ""}</div>
