@@ -227,7 +227,7 @@
       ],
     },
   ];
-  const MERGE_TEXT = "🌊 แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → ไหลผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ จึงไม่แสดง) → แล้วผ่านจุดวัดด้านล่างนี้ตามลำดับ ลงมาหาพื้นที่ของคุณ";
+  const MERGE_TEXT = "แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → ไหลผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ จึงไม่แสดง) → แล้วผ่านจุดวัดด้านล่างนี้ตามลำดับ ลงมาหาพื้นที่ของคุณ";
   const MAIN = [
     { kind: "gauge", station: STATIONS[1] },
     { kind: "gauge", station: STATIONS[2] },
@@ -236,7 +236,7 @@
   ];
   const FLOW = [...BRANCHES.flatMap((b) => b.nodes), ...MAIN];
 
-  const TYPE_LABEL = { dam: "🏞️ เขื่อน", gauge: "📏 จุดวัดระดับน้ำในแม่น้ำ" };
+  const TYPE_LABEL = { dam: "เขื่อน", gauge: "จุดวัดระดับน้ำในแม่น้ำ" };
   const TREND_TEXT = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] };
 
   // Gauges: centimetres and cm/hour (people read cm, not "0.13 m"). Dams: m3/s.
@@ -301,13 +301,13 @@
 
   function freshnessHtml(d) {
     const age = d.asOf ? `ข้อมูล ณ ${d.asOf} (ผ่านมา ${formatDuration(d.mins)})` : "ไม่ทราบเวลาของข้อมูล";
-    const warn = d.stale ? ` <span class="stale-badge">⚠ ${STALE_TEXT}</span>` : "";
+    const warn = d.stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : "";
     return `<div class="flow-meta" data-stale="${d.stale}">${age}${warn}</div>`;
   }
 
   function flowNodeHtml(node, d) {
     if (node.kind === "you") {
-      return `<li class="flow-node flow-you"><div class="flow-type">📍 พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
+      return `<li class="flow-node flow-you"><div class="flow-type">พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
     }
     const type = `<div class="flow-type" data-type="${node.kind}">${TYPE_LABEL[node.kind]}</div>`;
     const st = node.station;
@@ -392,7 +392,7 @@
     // One continuous line per river: each branch's line runs down into the merge point,
     // and the Mae Klong line continues from it — so nothing looks disconnected.
     const branch = (b, i) => `<div class="branch" data-branch="${i}"><div class="branch-title">${b.title}</div>
-        <ol class="flow">${items(b.nodes)}<li class="flow-end">⬇ ไหลไปบรรจบกันที่ จ.กาญจนบุรี</li></ol></div>`;
+        <ol class="flow">${items(b.nodes)}<li class="flow-end">↓ ไหลไปบรรจบกันที่ จ.กาญจนบุรี</li></ol></div>`;
     root.innerHTML = `<div class="flow-summary">${summary}</div>
       <div class="branches">${BRANCHES.map(branch).join("")}</div>
       <ol class="flow flow-main"><li class="flow-merge">${MERGE_TEXT}</li>${items(MAIN)}</ol>`;

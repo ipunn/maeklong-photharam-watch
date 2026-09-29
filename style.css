@@ -153,9 +153,10 @@ h1 {
 }
 
 .notice {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--stale-text);
+  color: var(--text);
   border-radius: 12px;
   padding: 12px 16px;
   margin: 0 0 16px;
@@ -220,7 +221,6 @@ h1 {
 
 .flow-you {
   border-color: var(--accent);
-  background: #eef4fd;
 }
 
 .flow-you::before {
@@ -325,19 +325,12 @@ h1 {
 }
 
 .flow-stale {
-  border-color: #f59e0b;
-  border-left: 4px solid #f59e0b;
-  background: #fffbeb;
+  border-color: var(--border);
 }
 
 .stale-badge {
-  display: inline-block;
-  background: #f59e0b;
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.75rem;
-  border-radius: 6px;
-  padding: 1px 8px;
+  color: var(--stale-text);
+  font-weight: 700;
   margin-left: 4px;
 }
 
@@ -350,13 +343,6 @@ h1 {
   color: var(--accent);
   font-weight: 600;
   margin-bottom: 12px;
-}
-
-.flow-note {
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  margin: -2px 0 10px;
-  padding-left: 4px;
 }
 
 .branches {
@@ -386,22 +372,6 @@ h1 {
   font-size: 0.9rem;
   color: var(--accent);
   margin: 0 0 8px;
-}
-
-.main-title {
-  margin-top: 4px;
-}
-
-.merge {
-  text-align: center;
-  color: var(--accent);
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: 1px dashed var(--accent);
-  border-radius: 10px;
-  padding: 8px 12px;
-  margin: 2px 0 14px;
-  background: #eef4fd;
 }
 
 /* ---- river line: one colour per river, lines run continuously into the merge ---- */
@@ -468,8 +438,8 @@ h1 {
 
 .flow-merge {
   position: relative;
-  background: #eef4fd;
-  border: 1px solid var(--accent);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 14px;
   margin-bottom: 10px;
@@ -525,12 +495,6 @@ h1 {
 
   .flow-value {
     font-size: 1.25rem;
-  }
-
-  .stale-badge {
-    display: block;
-    margin: 4px 0 0;
-    width: fit-content;
   }
 
   .legend,
@@ -627,28 +591,18 @@ h1 {
   padding: 14px 0;
 }
 
-/* dam capacity colour: the official Royal Irrigation Dept bands. Only the top two
-   bands are warm — the lower ones are drought categories, not flood risk. */
+/* dam capacity: font colour only, from the official Royal Irrigation Dept bands.
+   Only the top two bands are warm; lower ones are drought categories (plain text). */
 .band {
-  border-radius: 8px;
-  padding: 0 8px;
+  font-weight: 700;
 }
 
 .band[data-band="high"] {
-  background: #fde68a;
-  color: #78350f;
+  color: #b45309;
 }
 
 .band[data-band="over"] {
-  background: #fecaca;
-  color: #7f1d1d;
-}
-
-.band[data-band="medium"],
-.band[data-band="low"],
-.band[data-band="critical-low"] {
-  background: #e5e7eb;
-  color: var(--text);
+  color: #b91c1c;
 }
 
 .band .unit {
