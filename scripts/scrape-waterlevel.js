@@ -22,24 +22,17 @@ const {
   parseDamHourlyRecord,
   pickLatestDamHourly,
   isSameReading,
+  TRACKED_STATIONS,
 } = require("../parse.js");
 
-const DATA_DIR = path.join(__dirname, "..", "data");
+// DATA_DIR overrides the data folder so a run can be checked without touching the repo's data/.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "..", "data");
 
 // ThaiWater's own web app's data source — public, unauthenticated JSON, undocumented,
 // can change or break without notice (see docs/adr/0001).
 const WATERLEVEL_URL = "https://api-v3.thaiwater.net/api/v1/thaiwater30/public/waterlevel_load";
 
-// Tracked gauges, by ThaiWater station id, upstream to downstream. All verified against the
-// live feed (the spec's original id 505018 turned out to be K.58 บ้านปากแซง on the แควน้อย,
-// which is used here as a far-upstream gauge): 505018 K.58, 2679 K.11A บ้านวังขนาย,
-// 832066 K.55A สะพานค่ายหลวง, 710 โพธาราม.
-const STATIONS = [
-  { id: 505018, file: "pak-saeng.json" },
-  { id: 2679, file: "wang-khanai.json" },
-  { id: 832066, file: "khai-luang.json" },
-  { id: 710, file: "photharam.json" },
-];
+// Tracked gauges (every Site's) live in parse.js, TRACKED_STATIONS.
 
 // EGAT's reservoir table: a server-rendered HTML page. A daily report, so its figures are
 // stamped with the report's own as-of time (reportedAt), not with our scrape time.
@@ -114,7 +107,7 @@ const succeeded = (outcomes) => outcomes.includes("found") && !outcomes.includes
 async function scrapeRivers(scrapedAt) {
   const raw = await fetchOk(WATERLEVEL_URL, true);
   const records = (raw.waterlevel_data && raw.waterlevel_data.data) || [];
-  const outcomes = STATIONS.map(({ id, file }) =>
+  const outcomes = TRACKED_STATIONS.map(({ id, file }) =>
     runItem(file, () => {
       // Number() so a feed that starts sending ids as strings is not silently skipped.
       const record = records.find((r) => r.station && Number(r.station.id) === id);

@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -345,4 +345,20 @@ test("isSameReading ignores scrapedAt and compares the source's values", () => {
   assert.equal(isSameReading(a, { ...a, updatedAt: "2026-09-29T14:10:00+07:00" }), false);
   assert.equal(isSameReading(undefined, a), false); // nothing to compare with: append
   assert.equal(isSameReading({ ...a, extra: 1 }, a), false); // different shape is not the same reading
+});
+
+test("stationsForSite returns the Mae Klong gauges upstream to downstream, by ThaiWater station id", () => {
+  assert.deepEqual(stationsForSite("maeklong").map((s) => s.id), [505018, 2679, 832066, 710]);
+});
+
+test("stationsForSite returns nothing for an unknown Site — never another Site's gauges", () => {
+  assert.deepEqual(stationsForSite("nowhere"), []);
+});
+
+test("every tracked station has exactly one known Site and no station is listed twice", () => {
+  for (const s of TRACKED_STATIONS) assert.ok(SITES.includes(s.site), `station ${s.id} has unknown site ${s.site}`);
+  const ids = TRACKED_STATIONS.map((s) => s.id);
+  assert.equal(new Set(ids).size, ids.length);
+  const files = TRACKED_STATIONS.map((s) => s.file);
+  assert.equal(new Set(files).size, files.length);
 });

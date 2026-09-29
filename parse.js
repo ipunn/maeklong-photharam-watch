@@ -238,6 +238,25 @@ function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
   };
 }
 
+// A Site is a watched place with its own gauges and page (see CONTEXT.md). Every tracked
+// river gauge belongs to exactly one Site; the Collector serves them all in one run.
+const SITES = ["maeklong"];
+
+// Tracked river gauges, by ThaiWater station id, upstream to downstream within a Site.
+// All verified against the live feed (the spec's original id 505018 turned out to be K.58
+// บ้านปากแซง on the แควน้อย, which is used as a far-upstream gauge): 505018 K.58,
+// 2679 K.11A บ้านวังขนาย, 832066 K.55A สะพานค่ายหลวง, 710 โพธาราม.
+const TRACKED_STATIONS = [
+  { id: 505018, file: "pak-saeng.json", site: "maeklong" },
+  { id: 2679, file: "wang-khanai.json", site: "maeklong" },
+  { id: 832066, file: "khai-luang.json", site: "maeklong" },
+  { id: 710, file: "photharam.json", site: "maeklong" },
+];
+
+function stationsForSite(site) {
+  return TRACKED_STATIONS.filter((s) => s.site === site);
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

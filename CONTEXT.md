@@ -1,6 +1,12 @@
 # Domain glossary
 
-**Gauge** — a river water-level station tracked via ThaiWater, identified by its ThaiWater `station.id` and (where it has one) an agency code: K.58 บ้านปากแซง (แควน้อย), K.11A บ้านวังขนาย (แม่กลอง, below Mae Klong Dam — inferred, see `.scratch/**/research/river-line-order.md`), K.55A สะพานค่ายหลวง (บ้านโป่ง), RAJ001 โพธาราม. The watched area is อ.โพธาราม; the situation card shows โพธาราม and the nearest gauge upstream of it.
+**Gauge** — a river water-level station tracked via ThaiWater, identified by its ThaiWater `station.id` and (where it has one) an agency code: K.58 บ้านปากแซง (แควน้อย), K.11A บ้านวังขนาย (แม่กลอง, below Mae Klong Dam — inferred, see `.scratch/**/research/river-line-order.md`), K.55A สะพานค่ายหลวง (บ้านโป่ง), RAJ001 โพธาราม. For the Mae Klong Site the situation card shows โพธาราม and the nearest gauge upstream of it.
+
+**Site** — a watched place with its own gauges, headline and page. Two: อ.โพธาราม (Mae Klong) and หมู่บ้านพฤกษ์ภิรมย์ รีเจ้นท์ ปิ่นเกล้า (อ.บางกรวย, นนทบุรี; the waterway nearest the village is คลองบางค้อ). Sites share one Collector and one set of History.
+
+**Proxy gauge** — a Gauge that is near a Site but not on the waterway that threatens it. คลองบางค้อ has no gauge of its own, so the Bang Kruai Site shows only proxy gauges (e.g. BKK003 on คลองมหาสวัสดิ์, Chao Phraya gauges), each labelled with its relation to the village, side by side with no headline, under a fixed note that the canal itself is not measured.
+
+**Tide** — the twice-daily rise and fall of a tidal Gauge (Chao Phraya and its canals, unlike Mae Klong). A rising/falling trend is not meaningful there; the page shows each day's high and low instead.
 
 **Dam** — Vajiralongkorn (แควน้อย) or Srinakarin (แควใหญ่). The two rivers merge at ปากแพรก, Kanchanaburi, into the Mae Klong. A dam is not a Gauge: it has stored volume, level and release rather than a river reading.
 
@@ -14,7 +20,7 @@
 
 **Band** — the official Royal Irrigation Dept reservoir-status band for a capacity %: ≤30 น้ำน้อยวิกฤต, >30–50 น้ำน้อย, >50–80 น้ำปานกลาง, >80–100 น้ำมาก, >100 เกินความจุเก็บกัก. The page colours the top two red (a display choice); the band names are the agency's.
 
-**Status** — red/yellow/green severity of a Gauge reading, derived only from thresholds the source publishes. With no published threshold, or no level, status is **neutral** (null). We never guess one. None of the tracked gauges currently has a published threshold, so no gauge is coloured.
+**Status** — red/yellow/green severity of a Gauge reading, derived only from thresholds the source publishes. With no published threshold, or no level, status is **neutral** (null). We never guess one. None of the tracked gauges currently has a published threshold, so no gauge is coloured. Bank height may be shown as a fact next to a level; it does not colour anything.
 
 **History** — the append-only per-series log under `data/`. A reading identical to the last stored one is not appended again.
 
