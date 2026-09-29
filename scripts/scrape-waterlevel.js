@@ -1,26 +1,39 @@
-// Runs on a 15-minute GitHub Actions cron. Fetches ThaiWater's public
-// waterlevel feed (and EGAT's reservoir table), extracts the tracked river
-// stations and dams, and appends one row per station/dam to its own committed
-// history file under data/ (never overwritten — see .scratch/maeklong-photharam-water-monitor/spec.md for
-// why this is an append-only log, not a "latest reading" snapshot).
+// Runs on a GitHub Actions cron. Fetches three independent public sources, extracts the
+// tracked river gauges and dams, and appends to per-series history files under data/
+// (an append-only log, never a "latest reading" snapshot — see
+// .scratch/maeklong-photharam-water-monitor/spec.md).
 //
-// This script is a thin I/O wrapper: all parsing/derivation logic lives in
-// parse.js and is unit tested there. Nothing here is tested directly.
+// The sources are independent: one failing (HTTP error, changed shape, corrupt file) must
+// never stop the others. Each successful source stamps data/status.json with when it last
+// succeeded, so the site can tell "the collector stopped" from "the source is slow".
+//
+// An unchanged reading is not appended again (isSameReading), and every file is written
+// atomically (temp file + rename) so a crash cannot leave truncated JSON behind.
+//
+// This script is a thin I/O wrapper: parsing and derivation live in parse.js and are unit
+// tested there.
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly } = require("../parse.js");
+const {
+  parseWaterLevelRecord,
+  deriveStatus,
+  parseReservoirRecord,
+  parseReservoirReportDate,
+  parseDamHourlyRecord,
+  pickLatestDamHourly,
+  isSameReading,
+} = require("../parse.js");
 
-// ThaiWater's own React SPA's underlying data source — public, unauthenticated
-// JSON, same "undocumented but genuinely public" category as
-// BKK-Road-Flood-Checker's ThaiWater canal endpoint (see that repo's
-// ADR-0004). Can change or break without notice; no SLA.
+const DATA_DIR = path.join(__dirname, "..", "data");
+
+// ThaiWater's own web app's data source — public, unauthenticated JSON, undocumented,
+// can change or break without notice (see docs/adr/0001).
 const WATERLEVEL_URL = "https://api-v3.thaiwater.net/api/v1/thaiwater30/public/waterlevel_load";
 
-// Tracked stations, by ThaiWater station id, upstream to downstream. The last two
-// bracket the user's coordinate; the first two are early-warning gauges further
-// up the Mae Klong system (both verified against the live feed, not the spec's
-// original ids): 505018 บ้านปากแซง (แควน้อย, K.58, Sai Yok) and 2679 บ้านวังขนาย
-// (แม่กลอง, Tha Muang). 832066 (สะพานค่ายหลวง, Ban Pong) is upstream of 710.
+// Tracked gauges, by ThaiWater station id, upstream to downstream. All verified against the
+// live feed (the spec's original id 505018 turned out to be K.58 บ้านปากแซง on the แควน้อย,
+// which is used here as a far-upstream gauge): 505018 K.58, 2679 K.11A บ้านวังขนาย,
+// 832066 K.55A สะพานค่ายหลวง, 710 โพธาราม.
 const STATIONS = [
   { id: 505018, file: "pak-saeng.json" },
   { id: 2679, file: "wang-khanai.json" },
@@ -28,132 +41,174 @@ const STATIONS = [
   { id: 710, file: "photharam.json" },
 ];
 
-// EGAT's reservoir table: a plain server-rendered HTML page, no JS needed.
+// EGAT's reservoir table: a server-rendered HTML page. A daily report, so its figures are
+// stamped with the report's own as-of time (reportedAt), not with our scrape time.
 const RESERVOIR_URL = "https://water.egat.co.th/water_crisis.php";
-
-// Upstream leading-indicator dams, matched by the Thai name on the page. Each
-// has its own history series, separate from the river stations. The page has
-// no per-row timestamp, so each row is stamped with this run's scrapedAt.
 const RESERVOIRS = [
   { name: "วชิราลงกรณ", file: "reservoir-vajiralongkorn.json" },
   { name: "ศรีนครินทร์", file: "reservoir-srinakarin.json" },
 ];
 
-// ThaiWater's dam feed: hourly, with its own timestamp (unlike EGAT's daily table).
+// ThaiWater's dam feed: hourly, with its own timestamp.
 const DAM_HOURLY_URL = "https://api-v3.thaiwater.net/api/v1/thaiwater30/analyst/dam";
 const DAMS_HOURLY = [
   { id: 56, file: "dam-hourly-vajiralongkorn.json" },
   { id: 54, file: "dam-hourly-srinakarin.json" },
 ];
 
-function appendHistory(dataDir, file, row) {
-  const filePath = path.join(dataDir, file);
-  const history = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : [];
+function readJson(file, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(DATA_DIR, file), "utf8"));
+  } catch (err) {
+    if (err.code === "ENOENT") return fallback;
+    throw err; // corrupt JSON: fail this item loudly, never overwrite it
+  }
+}
+
+function writeJsonAtomic(file, value) {
+  const target = path.join(DATA_DIR, file);
+  const tmp = `${target}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + "\n");
+  fs.renameSync(tmp, target);
+}
+
+// Appends the row unless the source's reading is unchanged since the last stored row.
+function appendHistory(file, row) {
+  const history = readJson(file, []);
+  if (!Array.isArray(history)) throw new Error(`${file} is not a JSON array`);
+  if (isSameReading(history[history.length - 1], row)) return "unchanged";
   history.push(row);
-  fs.writeFileSync(filePath, JSON.stringify(history, null, 2) + "\n");
+  writeJsonAtomic(file, history);
+  return "appended";
 }
 
-async function scrapeReservoirs(dataDir, scrapedAt) {
-  const res = await fetch(RESERVOIR_URL);
-  if (!res.ok) throw new Error(`${RESERVOIR_URL} -> HTTP ${res.status}`);
-  const html = await res.text();
+async function fetchOk(url, asJson) {
+  const res = await fetch(url, asJson ? { headers: { Accept: "application/json" } } : undefined);
+  if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
+  return asJson ? res.json() : res.text();
+}
+
+// Runs one tracked item; an exception in one item is reported but does not stop the rest.
+// Returns "found" | "missing" | "failed".
+function runItem(label, fn) {
+  try {
+    const outcome = fn();
+    console.log(`${label}: ${outcome}`);
+    return "found";
+  } catch (err) {
+    if (err && err.missing) {
+      console.error(`${label}: not in this run's feed — skipping, no gap entry written.`);
+      return "missing";
+    }
+    console.error(`${label}: FAILED`, err);
+    return "failed";
+  }
+}
+
+const missing = (msg) => Object.assign(new Error(msg), { missing: true });
+
+// A source "succeeds" (and stamps status.json) when it was fetched, at least one tracked item
+// was found, and no item failed.
+const succeeded = (outcomes) => outcomes.includes("found") && !outcomes.includes("failed");
+
+async function scrapeRivers(scrapedAt) {
+  const raw = await fetchOk(WATERLEVEL_URL, true);
+  const records = (raw.waterlevel_data && raw.waterlevel_data.data) || [];
+  const outcomes = STATIONS.map(({ id, file }) =>
+    runItem(file, () => {
+      // Number() so a feed that starts sending ids as strings is not silently skipped.
+      const record = records.find((r) => r.station && Number(r.station.id) === id);
+      if (!record) throw missing(`station ${id}`);
+      const parsed = parseWaterLevelRecord(record);
+      const result = appendHistory(file, {
+        scrapedAt,
+        updatedAt: parsed.updatedAt,
+        levelMsl: parsed.levelMsl,
+        bankMsl: parsed.bankMsl,
+        status: deriveStatus(parsed.levelMsl, parsed.thresholds),
+      });
+      return `${result} level=${parsed.levelMsl} updatedAt=${parsed.updatedAt}`;
+    }),
+  );
+  return succeeded(outcomes);
+}
+
+async function scrapeReservoirs(scrapedAt) {
+  const html = await fetchOk(RESERVOIR_URL, false);
   const records = parseReservoirRecord(html);
-  // What the figures are as-of (EGAT publishes a daily report), distinct from scrapedAt.
   const reportedAt = parseReservoirReportDate(html);
-  if (!reportedAt) console.error("Could not read the EGAT report date — storing reportedAt: null (UI will not show it as fresh).");
-
-  for (const { name, file } of RESERVOIRS) {
-    const record = records.find((r) => r.name === name);
-    if (!record) {
-      console.error(`No row found for dam ${name} in this run — skipping, not writing a gap entry.`);
-      continue;
-    }
-    appendHistory(dataDir, file, {
-      scrapedAt,
-      reportedAt,
-      storageMcm: record.storageMcm,
-      storagePercent: record.storagePercent,
-      levelMsl: record.levelMsl,
-      releaseRateM3s: record.releaseRateM3s,
-    });
-    console.log(`${file}: appended storage=${record.storagePercent}% level=${record.levelMsl} release=${record.releaseRateM3s} m3/s`);
-  }
+  if (!reportedAt) console.error("Could not read the EGAT report date — storing reportedAt: null (the UI will not show it as fresh).");
+  const outcomes = RESERVOIRS.map(({ name, file }) =>
+    runItem(file, () => {
+      const record = records.find((r) => r.name === name);
+      if (!record) throw missing(`dam ${name}`);
+      const result = appendHistory(file, {
+        scrapedAt,
+        reportedAt,
+        storageMcm: record.storageMcm,
+        storagePercent: record.storagePercent,
+        levelMsl: record.levelMsl,
+        releaseRateM3s: record.releaseRateM3s,
+      });
+      return `${result} storage=${record.storagePercent}% release=${record.releaseRateM3s} m3/s reportedAt=${reportedAt}`;
+    }),
+  );
+  return succeeded(outcomes);
 }
 
-async function scrapeDamsHourly(dataDir, scrapedAt) {
-  const res = await fetch(DAM_HOURLY_URL, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`${DAM_HOURLY_URL} -> HTTP ${res.status}`);
-  const raw = await res.json();
+async function scrapeDamsHourly(scrapedAt) {
+  const raw = await fetchOk(DAM_HOURLY_URL, true);
   const records = (raw.data && raw.data.dam_hourly) || [];
-
-  for (const { id, file } of DAMS_HOURLY) {
-    const record = pickLatestDamHourly(records, id);
-    if (!record) {
-      console.error(`No hourly record for dam ${id} in this run — skipping, not writing a gap entry.`);
-      continue;
-    }
-    const p = parseDamHourlyRecord(record);
-    appendHistory(dataDir, file, {
-      scrapedAt,
-      reportedAt: p.reportedAt,
-      levelMsl: p.levelMsl,
-      storageMcm: p.storageMcm,
-      inflowMcm: p.inflowMcm,
-      releaseMcm: p.releaseMcm,
-      releaseM3s: p.releaseM3s,
-    });
-    console.log(`${file}: appended release=${p.releaseMcm} MCM/h (~${p.releaseM3s} m3/s) reportedAt=${p.reportedAt}`);
-  }
+  const outcomes = DAMS_HOURLY.map(({ id, file }) =>
+    runItem(file, () => {
+      const record = pickLatestDamHourly(records, id);
+      if (!record) throw missing(`dam ${id}`);
+      const p = parseDamHourlyRecord(record);
+      const result = appendHistory(file, {
+        scrapedAt,
+        reportedAt: p.reportedAt,
+        levelMsl: p.levelMsl,
+        storageMcm: p.storageMcm,
+        inflowMcm: p.inflowMcm,
+        releaseMcm: p.releaseMcm,
+        releaseM3s: p.releaseM3s,
+      });
+      return `${result} release=${p.releaseMcm} MCM/h (~${p.releaseM3s} m3/s) reportedAt=${p.reportedAt}`;
+    }),
+  );
+  return succeeded(outcomes);
 }
+
+const SOURCES = { river: scrapeRivers, reservoir: scrapeReservoirs, damHourly: scrapeDamsHourly };
 
 async function main() {
-  const res = await fetch(WATERLEVEL_URL, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`${WATERLEVEL_URL} -> HTTP ${res.status}`);
-  const raw = await res.json();
-  const records = (raw.waterlevel_data && raw.waterlevel_data.data) || [];
-
-  const dataDir = path.join(__dirname, "..", "data");
-  fs.mkdirSync(dataDir, { recursive: true });
-
+  fs.mkdirSync(DATA_DIR, { recursive: true });
   const scrapedAt = new Date().toISOString();
 
-  // The reservoir source is independent of the river source: a failure here
-  // must not stop the river stations being recorded (and vice versa below).
+  let status = {};
   try {
-    await scrapeReservoirs(dataDir, scrapedAt);
+    status = readJson("status.json", {});
   } catch (err) {
-    console.error("Reservoir scrape failed:", err);
+    console.error("status.json unreadable — starting it fresh:", err.message);
   }
 
-  // Independent of the other sources, like the reservoir scrape above.
-  try {
-    await scrapeDamsHourly(dataDir, scrapedAt);
-  } catch (err) {
-    console.error("Hourly dam scrape failed:", err);
-  }
-
-  for (const { id, file } of STATIONS) {
-    const record = records.find((r) => r.station && r.station.id === id);
-    if (!record) {
-      console.error(`No record found for station ${id} in this run — skipping, not writing a gap entry.`);
-      continue;
+  let failed = 0;
+  for (const [key, scrape] of Object.entries(SOURCES)) {
+    try {
+      if (await scrape(scrapedAt)) status[key] = scrapedAt; // last SUCCESS per source
+      else {
+        failed += 1;
+        console.error(`${key}: no usable data this run — its last-success time is not advanced.`);
+      }
+    } catch (err) {
+      failed += 1;
+      console.error(`${key}: scrape failed:`, err);
     }
-
-    const parsed = parseWaterLevelRecord(record);
-    const status = deriveStatus(parsed.levelMsl, parsed.thresholds);
-
-    const filePath = path.join(dataDir, file);
-    const history = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : [];
-    history.push({
-      scrapedAt,
-      updatedAt: parsed.updatedAt,
-      levelMsl: parsed.levelMsl,
-      bankMsl: parsed.bankMsl,
-      status,
-    });
-    fs.writeFileSync(filePath, JSON.stringify(history, null, 2) + "\n");
-    console.log(`${file}: appended level=${parsed.levelMsl} status=${status} updatedAt=${parsed.updatedAt}`);
   }
+  writeJsonAtomic("status.json", status);
+
+  // Only a total failure fails the run; otherwise the sources that worked still get committed.
+  process.exitCode = failed === Object.keys(SOURCES).length ? 1 : 0;
 }
 
 main().catch((err) => {

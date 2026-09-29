@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -306,4 +306,35 @@ test("collectorHealth flags a collector that has not run within the threshold", 
 test("collectorHealth is 'unknown' with no usable timestamp — never claims the collector is fine", () => {
   assert.equal(collectorHealth([], Date.now(), 45).status, "unknown");
   assert.equal(collectorHealth([null, undefined, "garbage"], Date.now(), 45).status, "unknown");
+});
+
+// ---- review fixes ----
+
+test("deriveStatus never guesses a colour for a missing level, even when thresholds exist", () => {
+  const th = { warningM: 5, criticalM: 7 };
+  assert.equal(deriveStatus(null, th), null); // null < 5 is true in JS: must not read as green
+  assert.equal(deriveStatus(undefined, th), null);
+  assert.equal(deriveStatus(NaN, th), null);
+  assert.equal(deriveStatus("4.9", th), null); // only real numbers are banded
+});
+
+test("damCapacity never reports negative room left when storage exceeds the derived capacity", () => {
+  const c = damCapacity(9000, 8534, 96.32); // more than the ~8,860 capacity backed out of EGAT
+  assert.equal(c.remainingMcm, 0);
+  assert.ok(c.percent > 100);
+});
+
+test("parseReservoirReportDate rejects a Gregorian year and an impossible calendar date instead of guessing", () => {
+  assert.equal(parseReservoirReportDate("<h2>28 กันยายน 2026 เวลา 24.00 น.</h2>"), null); // year must be Buddhist
+  assert.equal(parseReservoirReportDate("<h2>31 กันยายน 2569 เวลา 08.00 น.</h2>"), null); // September has 30 days
+  assert.equal(parseReservoirReportDate("<h2>30 กันยายน 2569 เวลา 08.00 น.</h2>"), "2026-09-30T08:00:00+07:00");
+});
+
+test("isSameReading ignores scrapedAt and compares the source's values", () => {
+  const a = { scrapedAt: "2026-09-29T07:00:00Z", updatedAt: "2026-09-29T14:00:00+07:00", levelMsl: 5, status: null };
+  assert.equal(isSameReading(a, { ...a, scrapedAt: "2026-09-29T07:15:00Z" }), true);
+  assert.equal(isSameReading(a, { ...a, levelMsl: 5.01 }), false);
+  assert.equal(isSameReading(a, { ...a, updatedAt: "2026-09-29T14:10:00+07:00" }), false);
+  assert.equal(isSameReading(undefined, a), false); // nothing to compare with: append
+  assert.equal(isSameReading({ ...a, extra: 1 }, a), false); // different shape is not the same reading
 });

@@ -1,4 +1,4 @@
-# 0001: Use ThaiWater's undocumented public endpoint for river levels
+# 0001: Rely on undocumented public endpoints (ThaiWater river + dam feeds, EGAT HTML)
 
 Status: accepted
 
@@ -13,6 +13,17 @@ returns ~800 stations across all basins (~1.4 MB), so we filter by
 
 No documented alternative covers the two Mae Klong stations we need.
 
+## Also covered by this decision
+
+- `https://api-v3.thaiwater.net/api/v1/thaiwater30/analyst/dam` (hourly `dam_hourly` records): same
+  status as `waterlevel_load`. Its `dam_storage_percent` is 0 for the dams we track, and
+  release/inflow carry no unit, so the unit was established by mass balance
+  (`.scratch/**/research/thaiwater-dam-feed-units.md`).
+- `https://water.egat.co.th/water_crisis.php`: server-rendered HTML, not an API at all. Rows are
+  matched by dam name but columns are read by position (`RESERVOIR_COL` in `parse.js`), so a
+  layout change silently shifts values. The real page is kept as `fixtures/egat-water-crisis.html`
+  and the parse tests fail if the columns move.
+
 ## Decision
 
 Use it anyway, and contain the risk:
@@ -20,6 +31,8 @@ Use it anyway, and contain the risk:
 - All parsing lives in one pure function, `parseWaterLevelRecord` (`parse.js`),
   covered by fixtures captured from the real feed. A shape change breaks one
   function and its tests, not the site.
+- The three sources are independent: one failing does not stop the others, and `data/status.json`
+  records each source's last success so a dead source cannot hide behind the rest.
 - The scraper never writes a gap entry when a station is missing from a run;
   history stays truthful. The site shows each reading's age and flags stale
   ones, so a broken feed reads as old data, not fresh data.

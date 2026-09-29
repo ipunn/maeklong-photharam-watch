@@ -1,24 +1,37 @@
-# เฝ้าระวังระดับน้ำแม่กลอง โพธาราม
+# เฝ้าระวังระดับน้ำ อำเภอโพธาราม
 
-Static site tracking Mae Klong river levels near Photharam, Ratchaburi.
-No gauge sits at the exact spot, so it shows the stations along the river
-above and below the area, plus upstream reservoir data as a leading
-indicator. UI is Thai-only.
+Static site (Thai only) for the Mae Klong river near Photharam, Ratchaburi. It leads with the
+watched area (the Photharam gauge and the nearest gauge upstream), then shows the river line
+from the upstream dams down to Photharam. It is a convenience view of public data, **not an
+official notice**: follow Ratchaburi province, DDPM (1784) and the Royal Irrigation Department.
 
-A GitHub Actions cron runs every 15 minutes, scrapes the sources, and appends
-one row per series to a committed history file under `data/`. The site
-(GitHub Pages, no build step) reads those files and draws trend charts.
+A GitHub Actions workflow scrapes the sources every ~15 minutes and appends to per-series
+history files under `data/`; GitHub Pages serves the site. No build step, no backend.
 
 ## Data sources
 
 | Data | Source | Notes |
 | --- | --- | --- |
-| River level (สะพานค่ายหลวง, โพธาราม) | ThaiWater `waterlevel_load` JSON | Undocumented but public; no SLA, may change without notice. See [ADR 0001](docs/adr/0001-thaiwater-undocumented-public-endpoint.md). Gauges report every ~10 min to ~1 h. |
-| Reservoirs (Vajiralongkorn, Srinakarin) | EGAT `water.egat.co.th/water_crisis.php` HTML table | Public page, scraped as HTML; no SLA. No per-row timestamp, so the scrape time is recorded. |
+| River gauges: K.58 บ้านปากแซง, K.11A บ้านวังขนาย, K.55A สะพานค่ายหลวง, โพธาราม | ThaiWater `waterlevel_load` JSON | Undocumented but public; no SLA; may change without notice ([ADR 0001](docs/adr/0001-thaiwater-undocumented-public-endpoint.md)). Gauges report roughly every 10 min to 1 h and ThaiWater can lag. |
+| Dam release, stored volume, level (hourly) | ThaiWater `analyst/dam` JSON (`dam_hourly`) | Same caveats. Release and inflow are million m³ per hour, converted to m³/s. Unit confirmed by mass balance: `.scratch/**/research/thaiwater-dam-feed-units.md`. |
+| Dam storage % (daily), used to back out capacity | EGAT `water.egat.co.th/water_crisis.php` HTML table | Scraped HTML; columns are read by position, so a layout change breaks it (caught by the fixture test). A daily report stamped as of the previous midnight. |
 
-Refresh cadence is 15 minutes; each reading shows its age and is flagged when stale.
-Status colors appear only where the source publishes an official threshold.
+Freshness is always the **source's own timestamp**. Anything older than 6 hours is flagged
+"ข้อมูลอาจไม่อัพเดทล่าสุด" (EGAT's daily table: 36 hours). A line at the top shows when each
+source last *succeeded* (`data/status.json`) and warns if one has not for 45 minutes.
 
-## Development
+**Colour.** Gauges have no published official thresholds, so none is coloured; the page shows
+direction of change instead. Dam capacity is coloured by the Royal Irrigation Department's
+reservoir bands (the top two bands red). The capacity % and room left are derived and labelled
+as estimates.
 
-`npm test` runs the pure parsing tests (Node's built-in runner); `npm run scrape` runs one scrape.
+**Not covered:** the Mae Klong Dam's own release has no automatic source, so it is not shown.
+
+## Running it
+
+- `npm test` — unit tests for the pure parsing/derivation code (`parse.js`).
+- `npm run scrape` — one scrape (writes `data/`).
+- GitHub Pages must be set to deploy from `main`, folder `/`. The workflow only commits data.
+- The workflow's `schedule` is on off-peak minutes (`7,22,37,52`) because GitHub delays or drops
+  scheduled runs at :00/:15/:30/:45. It can still be late or skipped, so the site's health line
+  is the thing to watch; `workflow_dispatch` runs it on demand.

@@ -33,7 +33,7 @@
   function ageMinutes(iso) {
     const ms = new Date(iso).getTime();
     if (Number.isNaN(ms)) return Infinity;
-    return (Date.now() - ms) / 60000;
+    return Math.max(0, (Date.now() - ms) / 60000);
   }
 
   function formatDuration(mins) {
@@ -83,35 +83,14 @@
   // timestamp, 3 h slack) and EGAT's daily report (storage %). Freshness of each is
   // judged from its OWN as-of time, never from scrapedAt. Freshness for EGAT is judged from the report's own as-of time
   // (reportedAt), with a day and a half of slack before flagging it.
+  // EGAT's table is a daily report stamped as of the previous midnight, so it is 6-30 h old
+  // for most of every day by design. Flagging it at 6 h would fire all day and teach people
+  // to ignore the warning; it gets a day and a half. The hourly feed uses the 6 h rule.
+  const EGAT_DAILY_STALE_MINUTES = 36 * 60;
   const RESERVOIRS = [
-    { file: "data/reservoir-vajiralongkorn.json", hourlyFile: "data/dam-hourly-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: STALE_MINUTES },
-    { file: "data/reservoir-srinakarin.json", hourlyFile: "data/dam-hourly-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: STALE_MINUTES },
+    { file: "data/reservoir-vajiralongkorn.json", hourlyFile: "data/dam-hourly-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: EGAT_DAILY_STALE_MINUTES },
+    { file: "data/reservoir-srinakarin.json", hourlyFile: "data/dam-hourly-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: EGAT_DAILY_STALE_MINUTES },
   ];
-
-  function renderChart(history, key = "levelMsl") {
-    if (history.length < 2) {
-      return `<div class="chart-empty">ยังไม่มีข้อมูลย้อนหลังพอสำหรับกราฟแนวโน้ม</div>`;
-    }
-    const w = 600;
-    const h = 120;
-    const pad = 8;
-    const levels = history.map((r) => r[key]).filter((v) => typeof v === "number");
-    const min = Math.min(...levels);
-    const max = Math.max(...levels);
-    const range = max - min || 1;
-
-    const points = history
-      .map((r, i) => {
-        const x = pad + (i / (history.length - 1)) * (w - pad * 2);
-        const y = h - pad - ((r[key] - min) / range) * (h - pad * 2);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(" ");
-
-    return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-      <polyline class="chart-line" points="${points}" />
-    </svg>`;
-  }
 
   function stationNameHtml(name, role) {
     return `<span class="station-name">${name}${role ? ` <span class="station-role">${role}</span>` : ""}</span>`;
@@ -130,8 +109,14 @@
       return card;
     }
 
+    if (typeof latest.levelMsl !== "number") {
+      card.innerHTML = `<div class="station-header">${stationNameHtml(name, role)}</div>
+        <div class="chart-empty">ไม่มีข้อมูลระดับน้ำจากแหล่งข้อมูลในรอบล่าสุด</div>`;
+      return card;
+    }
+
     const mins = ageMinutes(latest.updatedAt);
-    const stale = mins > staleMinutes;
+    const stale = !(mins <= staleMinutes);
     const statusLabel = latest.status ? STATUS_LABEL[latest.status] : "ไม่มีเกณฑ์เปรียบเทียบ";
 
     card.innerHTML = `
@@ -141,7 +126,7 @@
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
       <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
-      ${renderChart(history)}
+      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, 24, true)}
     `;
     return card;
   }
@@ -173,7 +158,7 @@
           <span class="unit">(${latest.releaseMcm.toFixed(2)} ล้าน ลบ.ม./ชม.)</span></div>
       </div>
       <div class="station-meta" data-stale="${stale}">${meta}</div>
-      ${renderChart(hourly, "releaseM3s")}`;
+      ${sparklineHtml(hourly, "releaseM3s", "reportedAt", "อัตราระบาย", "ลบ.ม./วินาที", 0, 50, 24, true)}`;
   }
 
   async function loadReservoir({ file, hourlyFile, name, staleMinutes }) {
@@ -354,7 +339,7 @@
     if (node.kind === "dam") {
       const band = d.capacity ? reservoirBand(d.capacity.percent) : null;
       const cap = d.capacity
-        ? `<div class="flow-value"><span class="flow-label">น้ำในเขื่อน</span>
+        ? `<div class="flow-value"><span class="flow-label">น้ำในเขื่อน (ประมาณ)</span>
              <span class="band" data-band="${band.key}">${d.capacity.percent.toFixed(1)} <span class="unit">% ของความจุ</span></span></div>
            <div class="flow-meta"><span class="band-tag" data-band="${band.key}">${band.label}</span> · รับน้ำได้อีก ≈ ${Math.round(d.capacity.remainingMcm).toLocaleString("en-US")} ล้าน ลบ.ม.</div>`
         : `<div class="flow-meta">ไม่มีข้อมูลความจุรายชั่วโมง</div>`;
@@ -424,12 +409,13 @@
       const upTrends = upstreamGauges.map((n) => datas.get(n).trend);
       const count = (dir) => upTrends.filter((t) => t && t.direction === dir).length;
       const unknown = upTrends.filter((t) => !t).length;
+      const staleUp = upstreamGauges.filter((n) => datas.get(n).stale).length;
       const damLines = FLOW.filter((n) => n.kind === "dam" && datas.get(n) && datas.get(n).latest.releaseM3s != null)
-        .map((n) => `${n.name.replace("เขื่อน", "")} ≈ ${datas.get(n).latest.releaseM3s.toLocaleString("en-US")}`);
+        .map((n) => `${n.name.replace("เขื่อน", "")} ≈ ${datas.get(n).latest.releaseM3s.toLocaleString("en-US")}${datas.get(n).stale ? ` (${STALE_TEXT})` : ""}`);
       here.innerHTML = `<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">อ.โพธาราม จ.ราชบุรี</span></h2>
         <ul class="here-grid">${flowNodeHtml(phNode, datas.get(phNode), "ในพื้นที่ / ท้ายน้ำ")}${flowNodeHtml(bpNode, datas.get(bpNode), "เหนือน้ำใกล้สุด")}</ul>
         <div class="here-summary">
-          <div><b>สัญญาณจากต้นน้ำ</b> — จุดวัด ${upstreamGauges.length} แห่งเหนือพื้นที่ของคุณ: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}</div>
+          <div><b>สัญญาณจากต้นน้ำ</b> — จุดวัด ${upstreamGauges.length} แห่งเหนือพื้นที่ของคุณ: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}${staleUp ? ` · <span class="health-warn">${STALE_TEXT} ${staleUp} จุด</span>` : ""}</div>
           ${damLines.length ? `<div>เขื่อนระบายน้ำ (ลบ.ม./วินาที): ${damLines.join(" · ")}</div>` : ""}
           <div class="here-more">ดูต้นน้ำและเขื่อนเพิ่มเติมด้านล่าง</div>
         </div>`;
@@ -443,35 +429,50 @@
       <ol class="flow flow-main"><li class="flow-merge">${MERGE_TEXT}</li>${items(MAIN)}</ol>`;
   }
 
-  // ---- Collector health: is the automatic collection itself running? ----
-  // Judged from the newest scrapedAt across ALL data files (when we last ran), which is
-  // separate from each card's data age (how old the SOURCE's reading is).
+  // ---- Collector health: is each automatic source still being collected? ----
+  // data/status.json holds, per source, when it last SUCCEEDED (the scraper only advances a
+  // source's time when that source was fetched and parsed). That is separate from each
+  // card's data age (how old the SOURCE's own reading is), and one dead source cannot hide
+  // behind the others.
   const COLLECTOR_WARN_MINUTES = 45; // the schedule is every 15 min; allow for GitHub delays
-  let collectorTimes = [];
+  const SOURCE_LABELS = {
+    river: "ระดับน้ำแม่น้ำ (ThaiWater)",
+    reservoir: "เขื่อนรายวัน (กฟผ.)",
+    damHourly: "เขื่อนรายชั่วโมง (ThaiWater)",
+  };
+  let collectorStatus = null;
 
   function renderHealth() {
     const el = document.getElementById("health");
     if (!el) return;
-    const h = collectorHealth(collectorTimes, Date.now(), COLLECTOR_WARN_MINUTES);
-    if (h.status === "unknown") {
-      el.innerHTML = `<span class="health-warn">ไม่ทราบเวลาที่ตัวดึงข้อมูลอัตโนมัติทำงานล่าสุด — ข้อมูลอาจไม่อัพเดทล่าสุด</span>`;
+    if (!collectorStatus) {
+      el.innerHTML = `<span class="health-warn">ไม่ทราบสถานะตัวดึงข้อมูลอัตโนมัติ — ข้อมูลอาจไม่อัพเดทล่าสุด</span>`;
       return;
     }
-    const when = formatShortTime(h.latest);
-    if (h.status === "stale") {
-      el.innerHTML = `<span class="health-warn">ตัวดึงข้อมูลอัตโนมัติไม่ทำงานมาแล้ว ${formatDuration(h.ageMinutes)} (ล่าสุด ${when}) — ข้อมูลด้านล่างอาจไม่อัพเดทล่าสุด</span>`;
+    const now = Date.now();
+    const per = Object.entries(SOURCE_LABELS).map(([key, label]) => ({
+      label,
+      h: collectorHealth([collectorStatus[key]], now, COLLECTOR_WARN_MINUTES),
+    }));
+    const bad = per.filter((x) => x.h.status !== "ok");
+    if (bad.length) {
+      const parts = bad.map((x) =>
+        x.h.status === "unknown" ? `${x.label} ไม่ทราบเวลา` : `${x.label} ไม่สำเร็จมาแล้ว ${formatDuration(x.h.ageMinutes)}`,
+      );
+      el.innerHTML = `<span class="health-warn">ตัวดึงข้อมูลอัตโนมัติมีปัญหา: ${parts.join(" · ")} — ข้อมูลของแหล่งนั้นอาจไม่อัพเดทล่าสุด</span>`;
       return;
     }
-    el.innerHTML = `ตัวดึงข้อมูลอัตโนมัติ: ทำงานล่าสุดเมื่อ ${formatDuration(h.ageMinutes)}ที่แล้ว (${when})`;
+    const newest = per.reduce((a, x) => (x.h.ageMinutes < a.h.ageMinutes ? x : a));
+    el.innerHTML = `ตัวดึงข้อมูลอัตโนมัติ: ดึงสำเร็จล่าสุดเมื่อ ${formatDuration(newest.h.ageMinutes)}ที่แล้ว (${formatShortTime(newest.h.latest)})`;
   }
 
   async function loadHealth() {
-    const files = [
-      ...STATIONS.map((st) => st.file),
-      ...RESERVOIRS.flatMap((r) => [r.file, r.hourlyFile]),
-    ];
-    const histories = await Promise.all(files.map((f) => getHistory(f).catch(() => [])));
-    collectorTimes = histories.map((rows) => (rows.length ? rows[rows.length - 1].scrapedAt : null));
+    try {
+      const res = await fetch("data/status.json", { cache: "no-store" });
+      collectorStatus = res.ok ? await res.json() : null;
+    } catch (err) {
+      collectorStatus = null;
+    }
     renderHealth();
     setInterval(renderHealth, 60000); // keep the age current if the page stays open
   }
@@ -482,10 +483,11 @@
       try {
         root.appendChild(await load(item));
       } catch (err) {
+        console.error(err);
         const card = document.createElement("div");
         card.className = "station-card";
         card.innerHTML = `<div class="station-header">${nameHtml(item)}</div>
-          <div class="chart-empty">โหลดข้อมูลไม่สำเร็จ: ${err.message}</div>`;
+          <div class="chart-empty">โหลดข้อมูลไม่สำเร็จ</div>`;
         root.appendChild(card);
       }
     }
@@ -494,7 +496,8 @@
   function main() {
     loadHealth();
     renderFlow().catch((err) => {
-      document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ: ${err.message}</div>`;
+      console.error(err);
+      document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ</div>`;
     });
     renderInto("stations", STATIONS, loadStation, (s) => stationNameHtml(s.name, s.role));
     renderInto("reservoirs", RESERVOIRS, loadReservoir, (r) => `<span class="station-name">${r.name}</span>`);

@@ -38,6 +38,8 @@ function parseWaterLevelRecord(raw) {
 // known — an unsourced guess is worse than no color at all.
 function deriveStatus(levelMsl, thresholds) {
   if (!thresholds) return null;
+  // A missing level must never be banded: `null < x` is true in JS and would read as green.
+  if (typeof levelMsl !== "number" || !Number.isFinite(levelMsl)) return null;
   if (levelMsl < thresholds.warningM) return "green";
   if (levelMsl < thresholds.criticalM) return "yellow";
   return "red";
@@ -94,7 +96,12 @@ function parseReservoirReportDate(raw) {
   if (!m) return null;
   const month = THAI_MONTHS.indexOf(m[2]);
   if (month < 0) return null;
+  // The page uses the Buddhist era. A year that is not plausibly Buddhist is unrecognised.
+  if (Number(m[3]) < 2400) return null;
   const year = Number(m[3]) - 543;
+  // An impossible date (e.g. 31 September) is unrecognised, not silently rolled over.
+  const day = new Date(Date.UTC(year, month, Number(m[1])));
+  if (day.getUTCMonth() !== month || day.getUTCDate() !== Number(m[1])) return null;
   // Date.UTC rolls hour 24 over to 00:00 of the next day for us.
   const bangkokAsUtc = new Date(Date.UTC(year, month, Number(m[1]), Number(m[4]), Number(m[5])));
   const p = (n) => String(n).padStart(2, "0");
@@ -147,7 +154,7 @@ function damCapacity(hourlyStorageMcm, egatStorageMcm, egatStoragePercent) {
   return {
     capacityMcm,
     percent: (hourlyStorageMcm / capacityMcm) * 100,
-    remainingMcm: capacityMcm - hourlyStorageMcm,
+    remainingMcm: Math.max(0, capacityMcm - hourlyStorageMcm),
   };
 }
 
@@ -161,6 +168,16 @@ function reservoirBand(percent) {
   if (percent > 50) return { key: "medium", label: "น้ำปานกลาง" };
   if (percent > 30) return { key: "low", label: "น้ำน้อย" };
   return { key: "critical-low", label: "น้ำน้อยวิกฤต" };
+}
+
+// True when `next` carries the same source values as the last stored row, ignoring
+// when we scraped it. Used so an unchanged reading is not appended every 15 minutes.
+function isSameReading(prev, next) {
+  if (!prev) return false;
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  keys.delete("scrapedAt");
+  for (const k of keys) if (prev[k] !== next[k]) return false;
+  return true;
 }
 
 // Is the automatic collector alive? Uses the newest `scrapedAt` (when WE last ran)
@@ -216,5 +233,5 @@ function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

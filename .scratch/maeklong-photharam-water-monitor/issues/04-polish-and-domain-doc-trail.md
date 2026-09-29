@@ -42,3 +42,10 @@ documented, and establishes this new repo's own domain-modeling trail
 ## Comments
 
 All but the live GitHub Pages verification is done. That needs the repo pushed to GitHub with Pages enabled; nothing has been pushed.
+
+## Comments (2026-09-29, after code review)
+
+README, ADR 0001 and CONTEXT.md rewritten to match the final behaviour. The remaining open
+item is the live check: the site is deployed, but confirm the scheduled scrape fires by itself
+(no run labelled "schedule" had appeared as of 07:50 UTC; the workflow's cron was moved to
+off-peak minutes) and that data commits reach the live site.

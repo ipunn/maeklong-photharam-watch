@@ -32,3 +32,11 @@ as the timestamp for each appended row.
       stations (this is upstream context, not a river reading)
 - [x] Runs independently of ticket 02 — this ticket does not depend on or
       block the Ban Pong station work
+
+## Comments (2026-09-29, after code review)
+
+The criteria above describe the first version. As built now: dams sit in the river line
+next to the gauges, not in a separate section; the headline release and the % of capacity
+come from ThaiWater's hourly feed (capacity backed out of EGAT's daily row, labelled as an
+estimate); EGAT's daily table is the secondary source, in the collapsed details. See
+CONTEXT.md and the README for the current behaviour.
