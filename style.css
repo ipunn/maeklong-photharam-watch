@@ -794,3 +794,59 @@ h1 {
   color: var(--text-dim);
   font-size: 0.8rem;
 }
+
+/* ---- hierarchy: the watched area is the main panel; the river line is supporting info ---- */
+.here {
+  background: var(--card-bg);
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 0 0 8px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.here .section-title {
+  font-size: 1.4rem;
+  margin: 0 0 12px;
+}
+
+.here .here-sub {
+  font-size: 0.95rem;
+}
+
+.here .flow-node {
+  background: var(--bg);
+  border: none;
+}
+
+.here .flow-name {
+  font-size: 1.1rem;
+}
+
+.here .flow-value {
+  font-size: 2rem;
+}
+
+.here-summary {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.context {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.context-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.context .section-title {
+  font-size: 1rem;
+  color: var(--text-dim);
+  margin-top: 0;
+}
