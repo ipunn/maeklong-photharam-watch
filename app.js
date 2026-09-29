@@ -264,6 +264,19 @@
     return `<span class="trend" data-dir="${t.direction}">${arrow} ${word} ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>${note}`;
   }
 
+  // The long view for a gauge: net change against ~24 h ago (nearest reading within +-1 h),
+  // so a slow rise or fall is visible beyond the 3 h trend above. Null-safe: no reading that
+  // far back means no claim.
+  const LONG_WINDOW_H = 24;
+  const LONG_STEADY_M = 0.05; // <= 5 cm over a day reads as "steady"
+  function longTrendHtml(t) {
+    if (!t) return `<div class="flow-meta"><span class="trend" data-dir="none">ยังไม่มีข้อมูลย้อนหลัง ${LONG_WINDOW_H} ชม. พอเทียบ</span></div>`;
+    const [arrow, word] = TREND_TEXT[t.direction];
+    const cm = Math.round(Math.abs(t.delta) * 100);
+    const text = t.direction === "steady" ? `${word}` : `${word} ${cm} ซม.`;
+    return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} เทียบ ${LONG_WINDOW_H} ชม.ก่อน: ${text}</span></div>`;
+  }
+
   // Every hourly chart shares ONE time axis: the right edge is the newest data hour across
   // all sources, so the same x position means the same clock time in every box. A series
   // whose newest reading is older simply stops short and is left blank up to the edge.
@@ -393,7 +406,7 @@
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
-      <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${freshnessHtml(d)}</div>
+      <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${longTrendHtml(d.longTrend)}${freshnessHtml(d)}</div>
       <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, CHART_WINDOW_H, true, true)}</div></div></li>`;
   }
 
@@ -425,6 +438,7 @@
       latest,
       rows,
       trend: trendOf(rows, "levelMsl", "updatedAt", TREND_WINDOW_H, GAUGE_STEADY_M),
+      longTrend: trendOf(rows, "levelMsl", "updatedAt", LONG_WINDOW_H, LONG_STEADY_M),
       mins,
       stale: !(mins <= STALE_MINUTES),
       asOf: latest.updatedAt ? formatShortTime(latest.updatedAt) : null,
