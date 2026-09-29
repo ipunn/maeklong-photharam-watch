@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -526,4 +526,18 @@ test("dailyValues keeps the latest report per day, drops non-numbers and unreada
   assert.deepEqual(days[days.length - 1], { date: "2026-09-28", v: 91 });
   assert.equal(days[0].date, "2026-09-21");
   assert.deepEqual(dailyValues([], "storagePercent", "reportedAt", 7), []);
+});
+
+test("aboveBankAlert is true only when the level is at least the alert margin above the bank", () => {
+  assert.equal(aboveBankAlert(3.07, 2.07, 1), true); // exactly 1 m above
+  assert.equal(aboveBankAlert(3.5, 2.07, 1), true);
+  assert.equal(aboveBankAlert(3.06, 2.07, 1), false);
+  assert.equal(aboveBankAlert(2.15, 2.07, 1), false);
+  assert.equal(aboveBankAlert(1.0, 2.07, 1), false); // below the bank is never an alert
+});
+
+test("aboveBankAlert is false — never true — when the level or the bank is missing", () => {
+  assert.equal(aboveBankAlert(null, 2.07, 1), false);
+  assert.equal(aboveBankAlert(3.5, null, 1), false);
+  assert.equal(aboveBankAlert(NaN, 2, 1), false);
 });

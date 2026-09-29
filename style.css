@@ -951,3 +951,31 @@ h1 {
   font-size: 0.68rem;
   color: var(--text-dim);
 }
+
+/* The page's own alert (level >= 1 m above the bank). Always paired with text saying it is not an official threshold. */
+.bank-pill[data-alert="true"] {
+  background: var(--status-red);
+  border-color: var(--status-red);
+  color: #fff;
+}
+.flow-alert {
+  border-color: var(--status-red);
+  box-shadow: 0 0 0 1px var(--status-red);
+}
+.alert-note,
+.alert-banner {
+  color: var(--status-red);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.alert-note .unit,
+.alert-banner .unit {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+.alert-banner {
+  border: 1.5px solid var(--status-red);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}

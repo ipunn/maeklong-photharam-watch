@@ -60,6 +60,11 @@
   // Level against the bank, as a fact: a pill (text + shape, no severity colour, since no
   // official flood level exists) and a thin bar showing how close the level is. The bank sits in
   // the middle, 0.75 m either side; a level outside it pins to the edge and the scale label says "เกินสเกล".
+  // The one alert this page raises: a level at least this far above the bank turns red. It is
+  // this site's own rule (chosen by the maintainer), NOT an official or source-published
+  // threshold, and the page says so wherever it shows red.
+  const ALERT_MARGIN_M = 1;
+  const ALERT_NOTE = `เกณฑ์เตือนที่ตั้งเองของเว็บนี้ (สูงกว่าตลิ่งตั้งแต่ ${ALERT_MARGIN_M} ม.) ไม่ใช่เกณฑ์ทางการ`;
   const BAR_BELOW_M = 0.75;
   const BAR_ABOVE_M = 0.75;
   function bankHtml(level, bank) {
@@ -68,7 +73,7 @@
     const pill =
       c.direction === "at"
         ? `<span class="bank-pill" data-side="at">■ เท่ากับตลิ่ง</span>`
-        : `<span class="bank-pill" data-side="${c.direction}">${c.direction === "above" ? "▲ สูงกว่า" : "▼ ต่ำกว่า"}ตลิ่ง ${c.diffM.toFixed(2)} ม.</span>`;
+        : `<span class="bank-pill" data-side="${c.direction}"${aboveBankAlert(level, bank, ALERT_MARGIN_M) ? ' data-alert="true"' : ""}>${c.direction === "above" ? "▲ สูงกว่า" : "▼ ต่ำกว่า"}ตลิ่ง ${c.diffM.toFixed(2)} ม.</span>`;
     const span = BAR_BELOW_M + BAR_ABOVE_M;
     const pct = (m) => Math.min(100, Math.max(0, ((m - (bank - BAR_BELOW_M)) / span) * 100));
     return `<div class="flow-meta bank-row">${pill} <span class="unit">ตลิ่ง ${bank.toFixed(2)} ม.รทก.</span></div>
@@ -77,7 +82,9 @@
         <span class="bank-tick" style="left:${pct(bank).toFixed(1)}%"></span>
         <span class="bank-dot" data-side="${c.direction}" style="left:${pct(level).toFixed(1)}%"></span>
       </div>
-      <div class="bank-scale"><span>${level < bank - BAR_BELOW_M ? "◀ เกินสเกล" : `${BAR_BELOW_M} ม.ใต้ตลิ่ง`}</span><span>ตลิ่ง</span><span>${level > bank + BAR_ABOVE_M ? "เกินสเกล ▶" : `${BAR_ABOVE_M} ม.เหนือตลิ่ง`}</span></div>`;
+      <div class="bank-scale"><span>${level < bank - BAR_BELOW_M ? "◀ เกินสเกล" : `${BAR_BELOW_M} ม.ใต้ตลิ่ง`}</span><span>ตลิ่ง</span><span>${level > bank + BAR_ABOVE_M ? "เกินสเกล ▶" : `${BAR_ABOVE_M} ม.เหนือตลิ่ง`}</span></div>${
+        aboveBankAlert(level, bank, ALERT_MARGIN_M) ? `<div class="alert-note">⚠ สูงกว่าตลิ่งเกิน ${ALERT_MARGIN_M} ม. <span class="unit">· ${ALERT_NOTE}</span></div>` : ""
+      }`;
   }
 
   // Tidal gauges: the latest two Bangkok days' high and low, one line each.
@@ -162,7 +169,7 @@
         ? `<div class="flow-value"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ${latest.dischargeM3s.toLocaleString("en")} <span class="unit">ลบ.ม./วินาที</span></div>
            <div class="flow-meta">วัดท้ายเขื่อนทดน้ำ เป็นอัตราการไหลของแม่น้ำ ไม่ใช่อัตราระบายของเขื่อน</div>`
         : "";
-    return `<li class="flow-node${stale ? " flow-stale" : ""}">${type}<div class="flow-name">${title}</div>
+    return `<li class="flow-node${stale ? " flow-stale" : ""}${aboveBankAlert(latest.levelMsl, latest.bankMsl, ALERT_MARGIN_M) ? " flow-alert" : ""}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
       ${bankHtml(latest.levelMsl, latest.bankMsl)}
@@ -201,7 +208,13 @@
       })
       .filter(Boolean);
     const staleCount = chaoPhraya.filter(({ d }) => d.summary.latest && !(ageMinutes(d.summary.latest.updatedAt) <= STALE_MINUTES)).length;
-    document.getElementById("here").innerHTML = `<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">พื้นที่ บางกรวย, บางคูเวียง จ.นนทบุรี</span></h2>
+    const alerting = [...stations.values()]
+      .filter((st) => { const l = data.get(st.id).summary.latest; return l && aboveBankAlert(l.levelMsl, l.bankMsl, ALERT_MARGIN_M); })
+      .map((st) => LABELS[st.id].name);
+    const alertBanner = alerting.length
+      ? `<div class="alert-banner" role="alert">⚠ ระดับน้ำสูงกว่าตลิ่งเกิน ${ALERT_MARGIN_M} ม.: ${alerting.join(" · ")}<div class="unit">${ALERT_NOTE} · โปรดติดตามประกาศทางการ</div></div>`
+      : "";
+    document.getElementById("here").innerHTML = `${alertBanner}<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">พื้นที่ บางกรวย, บางคูเวียง จ.นนทบุรี</span></h2>
       <ul class="here-grid">${nodeHtml(hereStation, data.get(HERE_ID))}</ul>
       <div class="here-summary">
         <div><b>สัญญาณจากแม่น้ำเจ้าพระยา</b> — ${c13 && typeof c13.dischargeM3s === "number" ? `อัตราการไหลท้ายเขื่อนเจ้าพระยา ≈ ${c13.dischargeM3s.toLocaleString("en")} ลบ.ม./วินาที` : "ไม่มีข้อมูลอัตราการไหลท้ายเขื่อนเจ้าพระยา"}${staleCount ? ` · <span class="health-warn">${STALE_TEXT} ${staleCount} จุด</span>` : ""}</div>

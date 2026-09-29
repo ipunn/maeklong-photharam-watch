@@ -298,6 +298,14 @@ function tideTrend(days) {
   };
 }
 
+// This site's OWN alert rule, chosen by the maintainer (not an official threshold, and not a
+// source-published one, so it is never written into Status): true when the level is at least
+// `marginM` above the bank height. False, never true, when either input is missing.
+function aboveBankAlert(levelMsl, bankMsl, marginM) {
+  const c = bankComparison(levelMsl, bankMsl);
+  return c !== null && c.direction === "above" && Math.round((levelMsl - bankMsl) * 100) >= Math.round(marginM * 100);
+}
+
 // One value per Bangkok day from a series of reports, newest `maxDays` days, oldest first.
 // A report stamped exactly midnight (EGAT's daily table, "24.00 น.") is the end of the day that
 // just finished, so its day is the minute before. Where a day has several reports the one with
@@ -346,5 +354,5 @@ function stationsForSite(site) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }
