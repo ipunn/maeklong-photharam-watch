@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -150,14 +150,14 @@ const byName = (records, name) => records.find((r) => r.name === name);
 test("parseReservoirRecord extracts Vajiralongkorn's storage %, level and release rate from the real EGAT page", () => {
   const dam = byName(parseReservoirRecord(EGAT_HTML), "วชิราลงกรณ");
   // Page row: level 154.15, storage 96.32%, release 0.00 MCM/day.
-  assert.deepEqual(dam, { name: "วชิราลงกรณ", storagePercent: 96.32, levelMsl: 154.15, releaseRateM3s: 0 });
+  assert.deepEqual(dam, { name: "วชิราลงกรณ", storagePercent: 96.32, storageMcm: 8534, levelMsl: 154.15, releaseRateM3s: 0 });
 });
 
 test("parseReservoirRecord extracts Srinakarin and converts its MCM/day release to m3/s", () => {
   const dam = byName(parseReservoirRecord(EGAT_HTML), "ศรีนครินทร์");
   // Page row: level 176.65, storage 92.27%, release 0.66 MCM/day
   // == 0.66 * 1,000,000 / 86,400 = 7.64 m3/s (hand-worked, 2 dp).
-  assert.deepEqual(dam, { name: "ศรีนครินทร์", storagePercent: 92.27, levelMsl: 176.65, releaseRateM3s: 7.64 });
+  assert.deepEqual(dam, { name: "ศรีนครินทร์", storagePercent: 92.27, storageMcm: 16374, levelMsl: 176.65, releaseRateM3s: 7.64 });
 });
 
 test("parseReservoirRecord returns only the two tracked dams, ignoring every other row", () => {
@@ -221,4 +221,22 @@ test("trendOf ignores repeated readings and returns null when there is too littl
   assert.equal(trendOf(repeated, "levelMsl", "updatedAt", 3, 0.02), null);
   assert.equal(trendOf([], "levelMsl", "updatedAt", 3, 0.02), null);
   assert.equal(trendOf([row("11:00", null), row("12:00", 1)], "levelMsl", "updatedAt", 3, 0.02), null);
+});
+
+// damCapacity: hourly stored volume as a % of capacity. ThaiWater's own
+// dam_storage_percent is 0 for these dams, so capacity is backed out of EGAT's
+// row (storage MCM / storage %) instead. Both figures come from the sources.
+test("damCapacity turns hourly storage into % of capacity and the room left (Vajiralongkorn)", () => {
+  // EGAT 28 Sep: 8,534 MCM = 96.32% -> capacity ~8,860 MCM. Hourly 29 Sep 12:00: 8,625.26 MCM.
+  const c = damCapacity(8625.26, 8534, 96.32);
+  assert.equal(Math.round(c.capacityMcm), 8860);
+  assert.ok(Math.abs(c.percent - 97.35) < 0.05, `percent ${c.percent}`);
+  assert.equal(Math.round(c.remainingMcm), 235);
+});
+
+test("damCapacity returns null when any input is missing or unusable — never guesses a capacity", () => {
+  assert.equal(damCapacity(null, 8534, 96.32), null);
+  assert.equal(damCapacity(8625, null, 96.32), null);
+  assert.equal(damCapacity(8625, 8534, 0), null);
+  assert.equal(damCapacity(8625, 8534, null), null);
 });

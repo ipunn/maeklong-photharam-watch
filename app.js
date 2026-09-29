@@ -3,16 +3,16 @@
 // already scraped and committed; never fetches ThaiWater/EGAT directly from
 // the browser.
 (function () {
-  // A reading older than the station's own reporting cadence (plus slack) is
-  // flagged, not hidden. Cadence differs per gauge, so it is per-station.
+  // Any data older than 6 hours is highlighted, never hidden or shown as fresh.
+  const STALE_MINUTES = 6 * 60;
+  const STALE_TEXT = "ข้อมูลอาจไม่อัพเดทล่าสุด";
 
   // Upstream first, so the cards read top-to-bottom as the water flows down to the user.
-  // Hourly gauges report about hourly (90 min slack); โพธาราม about every 10 min.
-  const STATIONS = [
-    { file: "data/pak-saeng.json", name: "บ้านปากแซง (แควน้อย, อ.ไทรโยค)", role: "ต้นน้ำไกล", staleMinutes: 90 },
-    { file: "data/wang-khanai.json", name: "บ้านวังขนาย (แม่กลอง, อ.ท่าม่วง)", role: "ใกล้ท้ายเขื่อนแม่กลอง", staleMinutes: 90 },
-    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง (อ.บ้านโป่ง)", role: "ต้นน้ำ", staleMinutes: 90 },
-    { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ", staleMinutes: 30 },
+    const STATIONS = [
+    { file: "data/pak-saeng.json", name: "บ้านปากแซง (แควน้อย, อ.ไทรโยค)", role: "ต้นน้ำไกล", staleMinutes: STALE_MINUTES },
+    { file: "data/wang-khanai.json", name: "บ้านวังขนาย (แม่กลอง, อ.ท่าม่วง)", role: "ใกล้ท้ายเขื่อนแม่กลอง", staleMinutes: STALE_MINUTES },
+    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง (อ.บ้านโป่ง)", role: "ต้นน้ำ", staleMinutes: STALE_MINUTES },
+    { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ", staleMinutes: STALE_MINUTES },
   ];
 
   // One fetch per history file, shared by the river-line overview and the cards.
@@ -75,8 +75,8 @@
   // judged from its OWN as-of time, never from scrapedAt. Freshness for EGAT is judged from the report's own as-of time
   // (reportedAt), with a day and a half of slack before flagging it.
   const RESERVOIRS = [
-    { file: "data/reservoir-vajiralongkorn.json", hourlyFile: "data/dam-hourly-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: 36 * 60 },
-    { file: "data/reservoir-srinakarin.json", hourlyFile: "data/dam-hourly-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: 36 * 60 },
+    { file: "data/reservoir-vajiralongkorn.json", hourlyFile: "data/dam-hourly-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: STALE_MINUTES },
+    { file: "data/reservoir-srinakarin.json", hourlyFile: "data/dam-hourly-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: STALE_MINUTES },
   ];
 
   function renderChart(history, key = "levelMsl") {
@@ -131,13 +131,13 @@
         <span class="status-dot" data-status="${latest.status || ""}" title="${statusLabel}"></span>
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
-      <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? " — ข้อมูลอาจไม่ล่าสุด" : ""}</div>
+      <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
       ${renderChart(history)}
     `;
     return card;
   }
 
-  const HOURLY_STALE_MINUTES = 180;
+  const HOURLY_STALE_MINUTES = STALE_MINUTES;
 
   // The hourly feed is an extra: if it fails, the card still shows EGAT's data.
   async function fetchHourlyHistory(file) {
@@ -157,7 +157,7 @@
     const stale = !(mins <= HOURLY_STALE_MINUTES);
     const asOf = latest.reportedAt ? formatReportTime(latest.reportedAt) : null;
     const meta = asOf
-      ? `ThaiWater (รายชั่วโมง) ณ ${asOf} (ผ่านมา ${formatDuration(mins)})${stale ? " — ข้อมูลเก่า อาจไม่ล่าสุด" : ""}`
+      ? `ThaiWater (รายชั่วโมง) ณ ${asOf} (ผ่านมา ${formatDuration(mins)})${stale ? ` — ${STALE_TEXT}` : ""}`
       : "ไม่ทราบเวลาของข้อมูล — อย่าใช้เป็นข้อมูลล่าสุด";
     return `<div class="reservoir-stats">
         <div><span class="stat-label">อัตราระบาย (ล่าสุด)</span> ≈ ${latest.releaseM3s} <span class="unit">ลบ.ม./วินาที</span>
@@ -188,7 +188,7 @@
     const stale = !asOf || mins > staleMinutes;
     const fmt = (v, digits) => (typeof v === "number" ? v.toFixed(digits) : "–");
     const metaText = asOf
-      ? `ข้อมูลรายวันของ กฟผ. ณ ${asOf} (ผ่านมา ${formatDuration(mins)})${stale ? " — ข้อมูลเก่ากว่า 1 วัน อาจไม่ล่าสุด" : ""}`
+      ? `ข้อมูลรายวันของ กฟผ. ณ ${asOf} (ผ่านมา ${formatDuration(mins)})${stale ? ` — ${STALE_TEXT}` : ""}`
       : "ไม่ทราบวันที่ของข้อมูล — อย่าใช้เป็นข้อมูลล่าสุด";
 
     card.innerHTML = `
@@ -207,76 +207,92 @@
 
 
   // ---- River line: every measuring point in flow order, upstream -> downstream ----
-  // Trends are computed only from the source's own timestamps and only over the data
-  // we really have (the real span is printed). No official thresholds exist for these
-  // gauges, so there is deliberately NO danger colour: direction of change only.
-  const GAUGE_TREND_WINDOW_H = 3;
+  // Only points that update automatically appear here. Trends come from the source's
+  // own timestamps, over the data we really have (the real span is printed). No
+  // official thresholds exist for these gauges, so there is deliberately NO danger
+  // colour: direction of change only.
+  const TREND_WINDOW_H = 3;
   const GAUGE_STEADY_M = 0.02; // <= 2 cm over the span reads as "steady"
   const RELEASE_STEADY_M3S = 10;
 
   const FLOW = [
-    { kind: "dam", branch: "แควใหญ่", name: "เขื่อนศรีนครินทร์", hourlyFile: RESERVOIRS[1].hourlyFile },
-    { kind: "dam", branch: "แควน้อย", name: "เขื่อนวชิราลงกรณ", hourlyFile: RESERVOIRS[0].hourlyFile },
+    { kind: "dam", branch: "แควใหญ่", name: "เขื่อนศรีนครินทร์", res: RESERVOIRS[1] },
+    { kind: "dam", branch: "แควน้อย", name: "เขื่อนวชิราลงกรณ", res: RESERVOIRS[0] },
     { kind: "gauge", branch: "แควน้อย", station: STATIONS[0] },
-    {
-      kind: "gap",
-      branch: "แม่กลอง",
-      name: "เขื่อนแม่กลอง",
-      text: "ไม่มีข้อมูลอัตโนมัติ — อัตราระบายต้องดูจากประกาศของกรมชลประทาน/จังหวัด/ปภ.",
-    },
+    { kind: "note", text: "แควใหญ่ (ศรีนครินทร์) และแควน้อย (วชิราลงกรณ) เป็นคนละสาย ไหลมารวมกันที่ จ.กาญจนบุรี กลายเป็นแม่น้ำแม่กลอง" },
     { kind: "gauge", branch: "แม่กลอง", station: STATIONS[1] },
     { kind: "gauge", branch: "แม่กลอง", station: STATIONS[2] },
     { kind: "you", name: "พื้นที่ของคุณ", text: "อำเภอโพธาราม จังหวัดราชบุรี" },
     { kind: "gauge", branch: "แม่กลอง", station: STATIONS[3] },
   ];
 
-  const TREND_TEXT = { rising: ["▲", "เพิ่มขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] };
+  const TYPE_LABEL = { dam: "🏞️ เขื่อน", gauge: "📏 จุดวัดระดับน้ำในแม่น้ำ" };
+  const TREND_TEXT = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] };
 
-  function trendHtml(t, unit, digits) {
+  // Gauges: centimetres and cm/hour (people read cm, not "0.13 m"). Dams: m3/s.
+  function trendHtml(t, kind) {
     if (!t) return `<span class="trend" data-dir="none">ยังไม่มีข้อมูลพอเทียบแนวโน้ม</span>`;
     const [arrow, word] = TREND_TEXT[t.direction];
-    const amount = t.direction === "steady" ? "" : ` ${Math.abs(t.delta).toFixed(digits)} ${unit}`;
-    return `<span class="trend" data-dir="${t.direction}">${arrow} ${word}${amount} ใน ${t.spanHours.toFixed(1)} ชม.ที่ผ่านมา</span>`;
+    const span = `ใน ${t.spanHours.toFixed(1)} ชม.ที่ผ่านมา`;
+    if (t.direction === "steady") return `<span class="trend" data-dir="steady">${arrow} ${word} ${span}</span>`;
+    if (kind === "dam") {
+      return `<span class="trend" data-dir="${t.direction}">${arrow} อัตราระบาย${word} ${Math.abs(Math.round(t.delta))} ลบ.ม./วินาที ${span}</span>`;
+    }
+    const cm = Math.abs(t.delta) * 100;
+    const perHour = cm / t.spanHours;
+    return `<span class="trend" data-dir="${t.direction}">${arrow} ${word} ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>`;
   }
 
-  function flowNodeHtml(node, data) {
+  function freshnessHtml(d) {
+    const age = d.asOf ? `ข้อมูล ณ ${d.asOf} (ผ่านมา ${formatDuration(d.mins)})` : "ไม่ทราบเวลาของข้อมูล";
+    const warn = d.stale ? ` <span class="stale-badge">⚠ ${STALE_TEXT}</span>` : "";
+    return `<div class="flow-meta" data-stale="${d.stale}">${age}${warn}</div>`;
+  }
+
+  function flowNodeHtml(node, d) {
+    if (node.kind === "note") return `<li class="flow-note">⤵ ${node.text}</li>`;
     if (node.kind === "you") {
-      return `<li class="flow-node flow-you"><div class="flow-name">📍 ${node.name}</div><div class="flow-meta">${node.text}</div></li>`;
+      return `<li class="flow-node flow-you"><div class="flow-type">📍 พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
     }
-    if (node.kind === "gap") {
-      return `<li class="flow-node flow-gap"><div class="flow-name"><span class="flow-branch">${node.branch}</span> ${node.name}</div><div class="flow-meta">${node.text}</div></li>`;
-    }
-    if (!data || !data.latest) {
-      const name = node.kind === "dam" ? node.name : node.station.name;
-      return `<li class="flow-node"><div class="flow-name">${name}</div><div class="flow-meta">ไม่มีข้อมูล</div></li>`;
-    }
-    const { latest, trend, stale, asOf } = data;
-    const age = asOf ? `ข้อมูล ณ ${asOf}` : "ไม่ทราบเวลาของข้อมูล";
-    const staleNote = stale ? " — ข้อมูลเก่า อาจไม่ล่าสุด" : "";
-    if (node.kind === "dam") {
-      const release = latest.releaseM3s == null ? "ไม่มีข้อมูล" : `≈ ${latest.releaseM3s} <span class="unit">ลบ.ม./วินาที</span>`;
-      return `<li class="flow-node"><div class="flow-name"><span class="flow-branch">${node.branch}</span> ${node.name} <span class="flow-role">เขื่อน</span></div>
-        <div class="flow-value"><span class="flow-label">ระบายน้ำ</span> ${release}</div>
-        <div class="flow-meta">${trendHtml(trend, "ลบ.ม./วินาที", 0)}</div>
-        <div class="flow-meta" data-stale="${stale}">${age}${staleNote}</div></li>`;
-    }
+    const type = `<div class="flow-type" data-type="${node.kind}">${TYPE_LABEL[node.kind]}</div>`;
     const st = node.station;
-    return `<li class="flow-node"><div class="flow-name"><span class="flow-branch">${node.branch}</span> ${st.name} <span class="flow-role">${st.role}</span></div>
-      <div class="flow-value"><span class="flow-label">ระดับน้ำ</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
-      <div class="flow-meta">${trendHtml(trend, "ม.", 2)}</div>
-      <div class="flow-meta" data-stale="${stale}">${age}${staleNote}</div></li>`;
+    const title = node.kind === "dam"
+      ? `<span class="flow-branch">${node.branch}</span> ${node.name}`
+      : `<span class="flow-branch">${node.branch}</span> ${st.name} <span class="flow-role">${st.role}</span>`;
+    if (!d) {
+      return `<li class="flow-node">${type}<div class="flow-name">${title}</div><div class="flow-meta">ไม่มีข้อมูล</div></li>`;
+    }
+    const cls = d.stale ? "flow-node flow-stale" : "flow-node";
+    if (node.kind === "dam") {
+      const cap = d.capacity
+        ? `<div class="flow-value"><span class="flow-label">น้ำในเขื่อน</span> ${d.capacity.percent.toFixed(1)} <span class="unit">% ของความจุ</span></div>
+           <div class="flow-meta">รับน้ำได้อีก ≈ ${Math.round(d.capacity.remainingMcm)} ล้าน ลบ.ม.</div>`
+        : `<div class="flow-meta">ไม่มีข้อมูลความจุรายชั่วโมง</div>`;
+      const release = d.latest.releaseM3s == null ? "ไม่มีข้อมูล" : `≈ ${d.latest.releaseM3s} <span class="unit">ลบ.ม./วินาที</span>`;
+      return `<li class="${cls}">${type}<div class="flow-name">${title}</div>${cap}
+        <div class="flow-value"><span class="flow-label">ระบายน้ำลงแม่น้ำ</span> ${release}</div>
+        <div class="flow-meta">${trendHtml(d.trend, "dam")}</div>${freshnessHtml(d)}</li>`;
+    }
+    return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
+      <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเลปานกลาง</span></div>
+      <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${freshnessHtml(d)}</li>`;
   }
 
   async function nodeData(node) {
     if (node.kind === "dam") {
-      const rows = await getHistory(node.hourlyFile).catch(() => []);
+      const rows = await getHistory(node.res.hourlyFile).catch(() => []);
       const latest = rows[rows.length - 1];
       if (!latest) return null;
+      // Capacity comes from EGAT's row (latest one that carries storage in MCM).
+      const egat = await getHistory(node.res.file).catch(() => []);
+      const egatRow = [...egat].reverse().find((r) => typeof r.storageMcm === "number");
       const mins = ageMinutes(latest.reportedAt);
       return {
         latest,
-        trend: trendOf(rows, "releaseM3s", "reportedAt", GAUGE_TREND_WINDOW_H, RELEASE_STEADY_M3S),
-        stale: !(mins <= HOURLY_STALE_MINUTES),
+        trend: trendOf(rows, "releaseM3s", "reportedAt", TREND_WINDOW_H, RELEASE_STEADY_M3S),
+        capacity: egatRow ? damCapacity(latest.storageMcm, egatRow.storageMcm, egatRow.storagePercent) : null,
+        mins,
+        stale: !(mins <= STALE_MINUTES),
         asOf: latest.reportedAt ? formatReportTime(latest.reportedAt) : null,
       };
     }
@@ -286,19 +302,20 @@
     const mins = ageMinutes(latest.updatedAt);
     return {
       latest,
-      trend: trendOf(rows, "levelMsl", "updatedAt", GAUGE_TREND_WINDOW_H, GAUGE_STEADY_M),
-      stale: !(mins <= node.station.staleMinutes),
+      trend: trendOf(rows, "levelMsl", "updatedAt", TREND_WINDOW_H, GAUGE_STEADY_M),
+      mins,
+      stale: !(mins <= STALE_MINUTES),
       asOf: latest.updatedAt ? formatReportTime(latest.updatedAt) : null,
     };
   }
 
   async function renderFlow() {
     const root = document.getElementById("flow");
-    const datas = await Promise.all(FLOW.map((n) => (n.kind === "gauge" || n.kind === "dam" ? nodeData(n).catch(() => null) : null)));
+    const datas = await Promise.all(FLOW.map((n) => (n.kind === "you" || n.kind === "note" ? null : nodeData(n).catch(() => null))));
     const gaugeTrends = FLOW.map((n, i) => (n.kind === "gauge" && datas[i] ? datas[i].trend : undefined)).filter((t) => t !== undefined);
     const count = (dir) => gaugeTrends.filter((t) => t && t.direction === dir).length;
     const unknown = gaugeTrends.filter((t) => !t).length;
-    const summary = `สถานีวัดระดับน้ำ ${gaugeTrends.length} แห่ง: ▲ เพิ่มขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}`;
+    const summary = `จุดวัดระดับน้ำ ${gaugeTrends.length} แห่ง: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}`;
     root.innerHTML = `<div class="flow-summary">${summary}</div>
       <ol class="flow">${FLOW.map((n, i) => flowNodeHtml(n, datas[i])).join("")}</ol>`;
   }

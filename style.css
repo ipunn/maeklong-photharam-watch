@@ -301,3 +301,59 @@ h1 {
   color: var(--accent);
   font-weight: 600;
 }
+
+.legend {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.legend > div + div {
+  margin-top: 6px;
+}
+
+.flow-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+.flow-stale {
+  border-color: #f59e0b;
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.stale-badge {
+  display: inline-block;
+  background: #f59e0b;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  padding: 1px 8px;
+  margin-left: 4px;
+}
+
+.detail-section {
+  margin-top: 8px;
+}
+
+.detail-section summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.flow-note {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin: -2px 0 10px;
+  padding-left: 4px;
+}

@@ -48,7 +48,7 @@ function deriveStatus(levelMsl, thresholds) {
 // page's row order and the other dams' rows are not ours to depend on).
 const TRACKED_RESERVOIRS = ["วชิราลงกรณ", "ศรีนครินทร์"];
 // Column offsets among the cells after the name cell.
-const RESERVOIR_COL = { levelMsl: 0, storagePercent: 2, releaseMcmPerDay: 10 };
+const RESERVOIR_COL = { levelMsl: 0, storageMcm: 1, storagePercent: 2, releaseMcmPerDay: 10 };
 
 function cellNumber(text) {
   const n = Number(text.replace(/,/g, ""));
@@ -71,6 +71,7 @@ function parseReservoirRecord(raw) {
     const mcmPerDay = values[RESERVOIR_COL.releaseMcmPerDay];
     records.push({
       name,
+      storageMcm: values[RESERVOIR_COL.storageMcm] ?? null,
       storagePercent: values[RESERVOIR_COL.storagePercent] ?? null,
       levelMsl: values[RESERVOIR_COL.levelMsl] ?? null,
       releaseRateM3s: mcmPerDay == null ? null : Math.round(((mcmPerDay * 1e6) / 86400) * 100) / 100,
@@ -136,6 +137,20 @@ function pickLatestDamHourly(records, damId) {
   return best;
 }
 
+// Hourly stored volume as a % of capacity. Capacity is backed out of EGAT's own row
+// (storage MCM / storage %) because ThaiWater's dam_storage_percent is 0 for these
+// dams. Null if any input is missing — no capacity is ever assumed.
+function damCapacity(hourlyStorageMcm, egatStorageMcm, egatStoragePercent) {
+  const ok = (v) => typeof v === "number" && Number.isFinite(v) && v > 0;
+  if (!ok(hourlyStorageMcm) || !ok(egatStorageMcm) || !ok(egatStoragePercent)) return null;
+  const capacityMcm = egatStorageMcm / (egatStoragePercent / 100);
+  return {
+    capacityMcm,
+    percent: (hourlyStorageMcm / capacityMcm) * 100,
+    remainingMcm: capacityMcm - hourlyStorageMcm,
+  };
+}
+
 // How a series moved, using only the readings we have. `timeKey` is the SOURCE's
 // own timestamp (repeated scrapes of one unchanged reading collapse to one point).
 // Compares the newest reading with the oldest one still inside `windowHours`, and
@@ -162,5 +177,5 @@ function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

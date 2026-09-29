@@ -71,6 +71,7 @@ async function scrapeReservoirs(dataDir, scrapedAt) {
     appendHistory(dataDir, file, {
       scrapedAt,
       reportedAt,
+      storageMcm: record.storageMcm,
       storagePercent: record.storagePercent,
       levelMsl: record.levelMsl,
       releaseRateM3s: record.releaseRateM3s,
