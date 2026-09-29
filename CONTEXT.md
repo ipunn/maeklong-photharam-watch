@@ -18,4 +18,4 @@
 
 **History** — the append-only per-series log under `data/`. A reading identical to the last stored one is not appended again.
 
-**Collector** — the GitHub Actions job that scrapes the sources. It is judged from `data/status.json`, per source, not from the data itself.
+**Collector** — the GitHub Actions workflow that scrapes the sources. Each run starts the next one itself (GitHub's `schedule` proved unreliable). It is judged from `data/status.json`, per source, not from the data itself.

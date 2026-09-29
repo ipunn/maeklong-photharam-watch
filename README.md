@@ -32,6 +32,12 @@ as estimates.
 - `npm test` — unit tests for the pure parsing/derivation code (`parse.js`).
 - `npm run scrape` — one scrape (writes `data/`).
 - GitHub Pages must be set to deploy from `main`, folder `/`. The workflow only commits data.
-- The workflow's `schedule` is on off-peak minutes (`7,22,37,52`) because GitHub delays or drops
-  scheduled runs at :00/:15/:30/:45. It can still be late or skipped, so the site's health line
-  is the thing to watch; `workflow_dispatch` runs it on demand.
+- **How collection keeps running.** GitHub's `schedule` never fired for this repo, so it is not
+  relied on. Each workflow run scrapes, commits, waits ~13 minutes and starts the next run itself
+  (with the built-in token; `workflow_dispatch` is allowed to be triggered that way). The
+  concurrency group keeps one running and one pending run, so duplicate chains collapse into one.
+  The `schedule` (off-peak minutes `7,22,37,52`) stays as a second trigger that can restart a dead
+  chain. To stop it on purpose, cancel the running run or disable the workflow. To restart it:
+  Actions tab -> "Scrape water levels" -> Run workflow.
+- It keeps a runner busy most of the day (free on public repos). If an external timer is added
+  later, drop the wait step. The site's health line is what tells you the chain has died.

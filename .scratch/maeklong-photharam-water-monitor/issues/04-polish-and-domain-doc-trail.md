@@ -49,3 +49,11 @@ README, ADR 0001 and CONTEXT.md rewritten to match the final behaviour. The rema
 item is the live check: the site is deployed, but confirm the scheduled scrape fires by itself
 (no run labelled "schedule" had appeared as of 07:50 UTC; the workflow's cron was moved to
 off-peak minutes) and that data commits reach the live site.
+
+## Comments (2026-09-29, later)
+
+GitHub's `schedule` never fired (0 runs in 2+ hours; Actions enabled, repo public, workflow on
+main). The workflow now starts its own next run; verified live for two hops (run -> bot-started
+run 08:20 -> bot-started run 08:33). Live check done: run -> bot commit -> Pages redeploy -> live
+JSON updated. Remaining: watch that the chain survives longer (the site's health line warns if
+it stops).
