@@ -227,7 +227,16 @@
       ],
     },
   ];
-  const MERGE_TEXT = "แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → ไหลผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ จึงไม่แสดง) → แล้วผ่านจุดวัดด้านล่างนี้ตามลำดับ ลงมาหาพื้นที่ของคุณ";
+  const MERGE_TEXT = "<span class=\"merge-lead\">แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → </span>ไหลผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ จึงไม่แสดง) → แล้วผ่านจุดวัดด้านล่างนี้ตามลำดับ ลงมาหาพื้นที่ของคุณ";
+  // Phones stack the two branches, which reads as one line. This small Y diagram shows
+  // two rivers converging into one. Hidden on wide screens, where the branches sit side
+  // by side and a real join bar already shows it.
+  const MERGE_DIAGRAM = `<div class="merge-diagram" aria-hidden="true">
+      <div class="md-top"><span>แควใหญ่</span><span>แควน้อย</span></div>
+      <svg viewBox="0 0 300 70" preserveAspectRatio="none">
+        <path d="M50 0 C50 34 150 26 150 48 V70" /><path d="M250 0 C250 34 150 26 150 48" />
+      </svg>
+      <div class="md-bottom">รวมเป็นแม่น้ำแม่กลอง ที่ปากแพรก จ.กาญจนบุรี</div></div>`;
   const MAIN = [
     { kind: "gauge", station: STATIONS[1] },
     { kind: "gauge", station: STATIONS[2] },
@@ -403,6 +412,7 @@
         <ol class="flow">${items(b.nodes)}<li class="flow-end">↓ ไหลไปบรรจบกันที่ จ.กาญจนบุรี</li></ol></div>`;
     root.innerHTML = `<div class="flow-summary">${summary}</div>
       <div class="branches">${BRANCHES.map(branch).join("")}</div>
+      ${MERGE_DIAGRAM}
       <ol class="flow flow-main"><li class="flow-merge">${MERGE_TEXT}</li>${items(MAIN)}</ol>`;
   }
 
