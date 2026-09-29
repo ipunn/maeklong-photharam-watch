@@ -891,3 +891,61 @@ h1 {
   color: var(--text);
   font-weight: 600;
 }
+
+/* Level against the bank: a pill (text + shape) and a thin position bar. No severity colour. */
+.bank-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.bank-pill[data-side="above"],
+.bank-pill[data-side="at"] {
+  background: var(--accent);
+  color: #fff;
+}
+.bank-bar {
+  position: relative;
+  height: 8px;
+  margin: 8px 0 2px;
+  border-radius: 4px;
+  background: var(--border);
+}
+.bank-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--accent);
+  opacity: 0.35;
+}
+.bank-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.bank-dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--card-bg);
+  box-sizing: border-box;
+}
+.bank-dot[data-side="above"] {
+  background: var(--text);
+}
+.bank-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}

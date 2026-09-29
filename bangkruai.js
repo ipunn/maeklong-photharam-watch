@@ -56,11 +56,27 @@
     return res.json();
   }
 
-  function bankText(level, bank) {
+  // Level against the bank, as a fact: a pill (text + shape, no severity colour, since no
+  // official flood level exists) and a thin bar showing how close the level is. The bank sits in
+  // the middle, 0.75 m either side; a level outside it pins to the edge.
+  const BAR_BELOW_M = 0.75;
+  const BAR_ABOVE_M = 0.75;
+  function bankHtml(level, bank) {
     const c = bankComparison(level, bank);
-    if (!c) return "ไม่มีข้อมูลความสูงตลิ่ง";
-    if (c.direction === "at") return "เท่ากับตลิ่ง";
-    return `<b>${c.direction === "above" ? "สูงกว่า" : "ต่ำกว่า"}ตลิ่ง ${c.diffM.toFixed(2)} ม.</b> (ตลิ่ง ${bank.toFixed(2)})`;
+    if (!c) return `<div class="flow-meta">ไม่มีข้อมูลความสูงตลิ่ง</div>`;
+    const pill =
+      c.direction === "at"
+        ? `<span class="bank-pill" data-side="at">■ เท่ากับตลิ่ง</span>`
+        : `<span class="bank-pill" data-side="${c.direction}">${c.direction === "above" ? "▲ สูงกว่า" : "▼ ต่ำกว่า"}ตลิ่ง ${c.diffM.toFixed(2)} ม.</span>`;
+    const span = BAR_BELOW_M + BAR_ABOVE_M;
+    const pct = (m) => Math.min(100, Math.max(0, ((m - (bank - BAR_BELOW_M)) / span) * 100));
+    return `<div class="flow-meta bank-row">${pill} <span class="unit">ตลิ่ง ${bank.toFixed(2)} ม.รทก.</span></div>
+      <div class="bank-bar" role="img" aria-label="ระดับน้ำเทียบตลิ่ง">
+        <span class="bank-fill" style="width:${pct(level).toFixed(1)}%"></span>
+        <span class="bank-tick" style="left:${pct(bank).toFixed(1)}%"></span>
+        <span class="bank-dot" data-side="${c.direction}" style="left:${pct(level).toFixed(1)}%"></span>
+      </div>
+      <div class="bank-scale"><span>${BAR_BELOW_M} ม.ใต้ตลิ่ง</span><span>ตลิ่ง</span><span>${BAR_ABOVE_M} ม.เหนือตลิ่ง</span></div>`;
   }
 
   // Tidal gauges: the latest two Bangkok days' high and low, one line each.
@@ -137,7 +153,7 @@
     return `<li class="flow-node${stale ? " flow-stale" : ""}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
-      <div class="flow-meta">${bankText(latest.levelMsl, latest.bankMsl)}</div>
+      ${bankHtml(latest.levelMsl, latest.bankMsl)}
       ${discharge}
       ${station.tidal ? dailyHtml(d.summary.days) : trendHtml(d.summary.recent)}
       <div class="flow-meta" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div></div>
