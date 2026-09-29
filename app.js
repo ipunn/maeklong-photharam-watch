@@ -9,9 +9,9 @@
 
   // Upstream first, so the cards read top-to-bottom as the water flows down to the user.
     const STATIONS = [
-    { file: "data/pak-saeng.json", name: "บ้านปากแซง (แควน้อย, อ.ไทรโยค)", role: "ต้นน้ำไกล", staleMinutes: STALE_MINUTES },
-    { file: "data/wang-khanai.json", name: "บ้านวังขนาย (แม่กลอง, อ.ท่าม่วง)", role: "ใกล้ท้ายเขื่อนแม่กลอง", staleMinutes: STALE_MINUTES },
-    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง (อ.บ้านโป่ง)", role: "ต้นน้ำ", staleMinutes: STALE_MINUTES },
+    { file: "data/pak-saeng.json", name: "บ้านปากแซง K.58 (แควน้อย, อ.ไทรโยค)", role: "ต้นน้ำไกล", staleMinutes: STALE_MINUTES },
+    { file: "data/wang-khanai.json", name: "บ้านวังขนาย K.11A (แม่กลอง, อ.ท่าม่วง)", role: "ท้ายเขื่อนแม่กลอง", staleMinutes: STALE_MINUTES },
+    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง K.55A (แม่กลอง, อ.บ้านโป่ง)", role: "ต้นน้ำ", staleMinutes: STALE_MINUTES },
     { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ", staleMinutes: STALE_MINUTES },
   ];
 
