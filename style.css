@@ -392,22 +392,6 @@ h1 {
   background: var(--status-red);
 }
 
-.branch[data-branch="0"] .flow {
-  --line: #7c3aed;
-}
-
-.branch[data-branch="1"] .flow {
-  --line: #0d9488;
-}
-
-.branch[data-branch="0"] .branch-title {
-  color: #7c3aed;
-}
-
-.branch[data-branch="1"] .branch-title {
-  color: #0d9488;
-}
-
 .branch .flow {
   margin-bottom: 4px;
 }
@@ -521,7 +505,7 @@ h1 {
     right: calc(50% - 16px);
     bottom: 0;
     height: 3px;
-    background: linear-gradient(90deg, #7c3aed, #0d9488);
+    background: var(--accent);
     opacity: 0.6;
     border-radius: 2px;
   }
