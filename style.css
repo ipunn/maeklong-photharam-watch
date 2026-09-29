@@ -17,7 +17,8 @@
 }
 
 body {
-  margin: 0;
+  max-width: 820px;
+  margin: 0 auto;
   font-family: "Noto Sans Thai", "Sarabun", system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -392,4 +393,167 @@ h1 {
   padding: 8px 12px;
   margin: 2px 0 14px;
   background: #eef4fd;
+}
+
+/* ---- river line: one colour per river, lines run continuously into the merge ---- */
+.flow {
+  --line: var(--accent);
+}
+
+.flow::before {
+  background: var(--line);
+  opacity: 0.6;
+}
+
+.flow-node::before {
+  background: var(--line);
+}
+
+.flow-you::before {
+  background: var(--status-red);
+}
+
+.branch[data-branch="0"] .flow {
+  --line: #7c3aed;
+}
+
+.branch[data-branch="1"] .flow {
+  --line: #0d9488;
+}
+
+.branch[data-branch="0"] .branch-title {
+  color: #7c3aed;
+}
+
+.branch[data-branch="1"] .branch-title {
+  color: #0d9488;
+}
+
+.branch .flow {
+  margin-bottom: 4px;
+}
+
+.branch .flow::before {
+  bottom: 14px;
+}
+
+.flow-end {
+  position: relative;
+  color: var(--line);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0 8px 4px;
+}
+
+.flow-end::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--line);
+  border: 2px solid var(--bg);
+}
+
+.flow-merge {
+  position: relative;
+  background: #eef4fd;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.flow-merge::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 14px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+
+.flow-main {
+  margin-top: 0;
+}
+
+.flow-main::before {
+  top: -14px;
+}
+
+.branch:last-child .flow {
+  margin-bottom: 0;
+}
+
+.branch:last-child .flow::before {
+  bottom: -14px;
+}
+
+/* phones: comfortable tap/reading sizes, nothing wider than the screen */
+@media (max-width: 480px) {
+  body {
+    padding: 12px;
+  }
+
+  h1 {
+    font-size: 1.15rem;
+  }
+
+  .flow {
+    padding-left: 20px;
+  }
+
+  .flow-node {
+    padding: 10px 12px;
+  }
+
+  .flow-value {
+    font-size: 1.25rem;
+  }
+
+  .stale-badge {
+    display: block;
+    margin: 4px 0 0;
+    width: fit-content;
+  }
+
+  .legend,
+  .notice {
+    font-size: 0.85rem;
+  }
+}
+
+/* wide screens: a real join — both branch lines run down and meet the trunk */
+@media (min-width: 760px) {
+  .branches {
+    position: relative;
+    padding-bottom: 18px;
+  }
+
+  .branch .flow::before {
+    bottom: -18px;
+  }
+
+  .branches::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: calc(50% - 16px);
+    bottom: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #7c3aed, #0d9488);
+    opacity: 0.6;
+    border-radius: 2px;
+  }
+
+  .flow-main::before {
+    top: -18px;
+  }
 }

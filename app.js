@@ -227,7 +227,7 @@
       ],
     },
   ];
-  const MERGE_TEXT = "แควใหญ่และแควน้อยไหลมารวมกันที่ จ.กาญจนบุรี กลายเป็นแม่น้ำแม่กลอง";
+  const MERGE_TEXT = "🌊 แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> — จุดถัดไปอยู่บนแม่น้ำสายเดียวกัน ไหลลงมาหาพื้นที่ของคุณ";
   const MAIN = [
     { kind: "gauge", station: STATIONS[1] },
     { kind: "gauge", station: STATIONS[2] },
@@ -322,15 +322,18 @@
     await Promise.all(
       FLOW.filter((n) => n.kind !== "you").map(async (n) => datas.set(n, await nodeData(n).catch(() => null))),
     );
-    const list = (nodes) => `<ol class="flow">${nodes.map((n) => flowNodeHtml(n, datas.get(n))).join("")}</ol>`;
+    const items = (nodes) => nodes.map((n) => flowNodeHtml(n, datas.get(n))).join("");
     const gaugeTrends = FLOW.filter((n) => n.kind === "gauge" && datas.get(n)).map((n) => datas.get(n).trend);
     const count = (dir) => gaugeTrends.filter((t) => t && t.direction === dir).length;
     const unknown = gaugeTrends.filter((t) => !t).length;
     const summary = `จุดวัดระดับน้ำ ${gaugeTrends.length} แห่ง: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}`;
+    // One continuous line per river: each branch's line runs down into the merge point,
+    // and the Mae Klong line continues from it — so nothing looks disconnected.
+    const branch = (b, i) => `<div class="branch" data-branch="${i}"><div class="branch-title">${b.title}</div>
+        <ol class="flow">${items(b.nodes)}<li class="flow-end">⬇ ไหลไปบรรจบกันที่ จ.กาญจนบุรี</li></ol></div>`;
     root.innerHTML = `<div class="flow-summary">${summary}</div>
-      <div class="branches">${BRANCHES.map((b) => `<div class="branch"><div class="branch-title">${b.title}</div>${list(b.nodes)}</div>`).join("")}</div>
-      <div class="merge">⬇ ${MERGE_TEXT}</div>
-      <div class="branch-title main-title">แม่น้ำแม่กลอง</div>${list(MAIN)}`;
+      <div class="branches">${BRANCHES.map(branch).join("")}</div>
+      <ol class="flow flow-main"><li class="flow-merge">${MERGE_TEXT}</li>${items(MAIN)}</ol>`;
   }
 
   async function renderInto(rootId, items, load, nameHtml) {
