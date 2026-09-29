@@ -3,12 +3,13 @@
 // already scraped and committed; never fetches ThaiWater/EGAT directly from
 // the browser.
 (function () {
-  const STALE_MINUTES = 60; // a river gauge reading older than this is flagged, not hidden
+  // A reading older than the station's own reporting cadence (plus slack) is
+  // flagged, not hidden. Cadence differs per gauge, so it is per-station.
 
   // Upstream first, so the two cards read top-to-bottom as the river flows.
   const STATIONS = [
-    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง (อ.บ้านโป่ง)", role: "ต้นน้ำ" },
-    { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ" },
+    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง (อ.บ้านโป่ง)", role: "ต้นน้ำ", staleMinutes: 90 },
+    { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ", staleMinutes: 30 },
   ];
 
   function ageMinutes(iso) {
@@ -56,7 +57,11 @@
     </svg>`;
   }
 
-  async function loadStation({ file, name, role }) {
+  function stationNameHtml(name, role) {
+    return `<span class="station-name">${name} <span class="station-role">${role}</span></span>`;
+  }
+
+  async function loadStation({ file, name, role, staleMinutes }) {
     const res = await fetch(file, { cache: "no-store" });
     if (!res.ok) throw new Error(`${file} -> HTTP ${res.status}`);
     const history = await res.json();
@@ -66,18 +71,18 @@
     card.className = "station-card";
 
     if (!latest) {
-      card.innerHTML = `<div class="station-header"><span class="station-name">${name} <span class="station-role">${role}</span></span></div>
+      card.innerHTML = `<div class="station-header">${stationNameHtml(name, role)}</div>
         <div class="chart-empty">ยังไม่มีข้อมูล</div>`;
       return card;
     }
 
     const mins = ageMinutes(latest.updatedAt);
-    const stale = mins > STALE_MINUTES;
+    const stale = mins > staleMinutes;
     const statusLabel = latest.status ? STATUS_LABEL[latest.status] : "ไม่มีเกณฑ์เปรียบเทียบ";
 
     card.innerHTML = `
       <div class="station-header">
-        <span class="station-name">${name} <span class="station-role">${role}</span></span>
+        ${stationNameHtml(name, role)}
         <span class="status-dot" data-status="${latest.status || ""}" title="${statusLabel}"></span>
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
@@ -95,7 +100,7 @@
       } catch (err) {
         const card = document.createElement("div");
         card.className = "station-card";
-        card.innerHTML = `<div class="station-header"><span class="station-name">${station.name} <span class="station-role">${station.role}</span></span></div>
+        card.innerHTML = `<div class="station-header">${stationNameHtml(station.name, station.role)}</div>
           <div class="chart-empty">โหลดข้อมูลไม่สำเร็จ: ${err.message}</div>`;
         root.appendChild(card);
       }
