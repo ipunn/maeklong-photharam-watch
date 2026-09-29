@@ -591,18 +591,19 @@ h1 {
   padding: 14px 0;
 }
 
-/* dam capacity: font colour only, from the official Royal Irrigation Dept bands.
-   Only the top two bands are warm; lower ones are drought categories (plain text). */
+/* dam capacity: font colour only, on the official Royal Irrigation Dept bands.
+   More than 80-100% (น้ำมาก) = red; over 100% (เกินความจุเก็บกัก) = brighter red.
+   Lower bands are drought categories, shown as plain text. */
 .band {
   font-weight: 700;
 }
 
 .band[data-band="high"] {
-  color: #b45309;
+  color: #b91c1c;
 }
 
 .band[data-band="over"] {
-  color: #b91c1c;
+  color: #e60000;
 }
 
 .band .unit {
@@ -614,11 +615,11 @@ h1 {
 }
 
 .band-tag[data-band="high"] {
-  color: #b45309;
+  color: #b91c1c;
 }
 
 .band-tag[data-band="over"] {
-  color: #b91c1c;
+  color: #e60000;
 }
 
 /* the two upstream branches share a row on wide screens, so their cards stay single-column */
