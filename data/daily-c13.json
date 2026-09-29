@@ -1,0 +1,17 @@
+{
+  "latest": {
+    "scrapedAt": "2026-09-29T14:08:47.890Z",
+    "updatedAt": "2026-09-29T20:00:00+07:00",
+    "levelMsl": 14.74,
+    "bankMsl": 16.34,
+    "status": null,
+    "dischargeM3s": 2022
+  },
+  "days": [],
+  "recent": [
+    {
+      "t": "2026-09-29T13:00:00.000Z",
+      "v": 14.74
+    }
+  ]
+}
