@@ -676,3 +676,7 @@ h1 {
   color: var(--text-dim);
   font-size: 0.8rem;
 }
+
+.station-card {
+  --line: var(--accent);
+}

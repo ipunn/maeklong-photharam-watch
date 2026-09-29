@@ -35,3 +35,17 @@ A web search returned a secondary GitHub write-up (github.com/gain9999/thaiwater
 ## Residual doubt and how to settle it
 
 Ask HII (info_thaiwater@hii.or.th, listed on the thaiwater.net footer) for the field definition, or run the two-consecutive-hours test in item 5.
+
+
+## Update 2026-09-29: per-hour basis confirmed by mass balance (high confidence)
+
+Two consecutive hourly readings (12:00 -> 13:00, our own scrapes of the feed):
+
+| Dam | storage change | inflow - release (that hour) |
+|---|---|---|
+| Srinagarind | 16,474.06 -> 16,482.06 = +8.00 | 8.05 - 0 = +8.05 |
+| Vajiralongkorn | 8,625.26 -> 8,629.10 = +3.84 | 5.12 - 1.24 = +3.88 |
+
+Storage moves by inflow minus release within ~1%, so inflow/release are million m3
+over the hour and storage is a stock in million m3. The feed's `dam_hourly` values do
+change hourly (unlike EGAT's daily table, which changes once a day).

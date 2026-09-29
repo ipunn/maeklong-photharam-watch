@@ -200,7 +200,7 @@
         <div><span class="stat-label">อัตราระบายเฉลี่ยรายวัน (กฟผ.)</span> ${fmt(latest.releaseRateM3s, 2)} <span class="unit">ลบ.ม./วินาที</span></div>
       </div>
       <div class="station-meta" data-stale="${stale}">${metaText}</div>
-      ${renderChart(history, "storagePercent")}
+      ${sparklineHtml(history, "storagePercent", "reportedAt", "% ความจุ (รายงานรายวัน 1 จุด/วัน)", "%", 2, 1, 24 * 30)}
     `;
     return card;
   }
@@ -263,10 +263,10 @@
 
   // Small trend chart: x is real time (not index), only distinct source timestamps,
   // last 24 h. Caption prints the real span and first -> last so it can't overstate.
-  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange) {
+  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24) {
     const all = seriesOf(rows, valueKey, timeKey);
     const latestT = all.length ? all[all.length - 1].t : 0;
-    const pts = all.filter((p) => p.t >= latestT - 24 * 3600000);
+    const pts = all.filter((p) => p.t >= latestT - windowHours * 3600000);
     if (pts.length < 2) {
       return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
     }
@@ -296,7 +296,7 @@
       <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${label}">
         <polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" />
       </svg>
-      <div class="spark-cap">${spanH.toFixed(1)} ชม.: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div></div>`;
+      <div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div></div>`;
   }
 
   function freshnessHtml(d) {
