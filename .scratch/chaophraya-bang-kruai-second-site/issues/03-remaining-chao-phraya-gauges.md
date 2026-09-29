@@ -1,6 +1,6 @@
 # 03: Remaining Chao Phraya gauges
 
-**What to build:** C.12 สามเสน (id 2599), CPY014 ปากเกร็ด (id 26) and CPY015 สะพานกรุงเทพ (id 4) appear on the Bang Kruai page side by side with BKK003, each labelled with its waterway and its relation to the village, with no headline gauge. Same freshness, stale flag and bank comparison as BKK003.
+**What to build:** C.12 สามเสน (id 2599), CPY014 ปากเกร็ด (id 26) and CPY015 สะพานกรุงเทพ (id 4) appear on the Bang Kruai page side by side with BKK003, each labelled with its waterway and its relation to the area, with no headline gauge. Same freshness, stale flag and bank comparison as BKK003.
 
 **Blocked by:** 02 (Bang Kruai page, first gauge end to end).
 

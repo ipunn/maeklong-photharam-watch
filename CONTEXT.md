@@ -2,9 +2,9 @@
 
 **Gauge** — a river water-level station tracked via ThaiWater, identified by its ThaiWater `station.id` and (where it has one) an agency code: K.58 บ้านปากแซง (แควน้อย), K.11A บ้านวังขนาย (แม่กลอง, below Mae Klong Dam — inferred, see `.scratch/**/research/river-line-order.md`), K.55A สะพานค่ายหลวง (บ้านโป่ง), RAJ001 โพธาราม. For the Mae Klong Site the situation card shows โพธาราม and the nearest gauge upstream of it.
 
-**Site** — a watched place with its own gauges, headline and page. Two: อ.โพธาราม (Mae Klong) and หมู่บ้านพฤกษ์ภิรมย์ รีเจ้นท์ ปิ่นเกล้า (อ.บางกรวย, นนทบุรี; the waterway nearest the village is คลองบางค้อ). Sites share one Collector and one set of History.
+**Site** — a watched place with its own gauges, headline and page. Two: อ.โพธาราม (Mae Klong) and พื้นที่ บางกรวย, บางคูเวียง (อ.บางกรวย, นนทบุรี; the waterway nearest the area is คลองบางค้อ). Sites share one Collector and one set of History.
 
-**Proxy gauge** — a Gauge that is near a Site but not on the waterway that threatens it. คลองบางค้อ has no gauge of its own, so the Bang Kruai Site shows only proxy gauges (e.g. BKK003 on คลองมหาสวัสดิ์, Chao Phraya gauges), each labelled with its relation to the village, side by side with no headline, under a fixed note that the canal itself is not measured.
+**Proxy gauge** — a Gauge that is near a Site but not on the waterway that threatens it. คลองบางค้อ has no gauge of its own, so the Bang Kruai Site shows only proxy gauges (e.g. BKK003 on คลองมหาสวัสดิ์, Chao Phraya gauges), each labelled with its relation to the area, side by side with no headline, under a fixed note that the canal itself is not measured.
 
 **Tide** — the twice-daily rise and fall of a tidal Gauge (Chao Phraya and its canals, unlike Mae Klong). A rising/falling trend is not meaningful there; the page shows each day's high and low instead.
 

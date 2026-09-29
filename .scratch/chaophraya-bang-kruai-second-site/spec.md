@@ -1,22 +1,22 @@
 Status: ready-for-agent
 
-# Second Site: หมู่บ้านพฤกษ์ภิรมย์ รีเจ้นท์ ปิ่นเกล้า (Bang Kruai) — Spec
+# Second Site: พื้นที่ บางกรวย, บางคูเวียง (Bang Kruai) — Spec
 
 Research: `research/second-location-feasibility.md` (including the คลองบางค้อ addendum). Vocabulary: `CONTEXT.md` (**Site**, **Proxy gauge**, **Tide**, **Status**). Constraint: `docs/adr/0001-thaiwater-undocumented-public-endpoint.md`.
 
 ## Problem Statement
 
-I live in หมู่บ้านพฤกษ์ภิรมย์ รีเจ้นท์ ปิ่นเกล้า (อ.บางกรวย, นนทบุรี), where flooding is a recurring risk (the municipality says the area floods almost every year). The waterway closest to the village is คลองบางค้อ, a small tidal canal off คลองอ้อมนนท์. No gauge sits on it and no source publishes a level, gate status or flood threshold for it. I have no single place to see whether the water around us is high, rising because of the tide, or rising because of upstream release. The repo I already trust for Mae Klong / Photharam only covers that area.
+I live in the area of บางกรวย, บางคูเวียง (อ.บางกรวย, นนทบุรี), where flooding is a recurring risk (the municipality says the area floods almost every year). The waterway closest to my home is คลองบางค้อ, a small tidal canal off คลองอ้อมนนท์. No gauge sits on it and no source publishes a level, gate status or flood threshold for it. I have no single place to see whether the water around us is high, rising because of the tide, or rising because of upstream release. The repo I already trust for Mae Klong / Photharam only covers that area.
 
 ## Solution
 
-Add a second **Site** to the existing repo and Collector, with its own page. The Bang Kruai page shows nearby **Proxy gauges** (คลองมหาสวัสดิ์, Chao Phraya) side by side, each labelled with how it relates to the village, plus the C.13 (Chao Phraya Dam) discharge as the upstream signal. Because these gauges are tidal, it shows each day's high and low rather than a rising/falling trend. A fixed note says the canal itself is not measured. As with Mae Klong there is no status colour and no alert; levels are stated as facts, including "above the bank" where the source's bank height says so.
+Add a second **Site** to the existing repo and Collector, with its own page. The Bang Kruai page shows nearby **Proxy gauges** (คลองมหาสวัสดิ์, Chao Phraya) side by side, each labelled with how it relates to the area, plus the C.13 (Chao Phraya Dam) discharge as the upstream signal. Because these gauges are tidal, it shows each day's high and low rather than a rising/falling trend. A fixed note says the canal itself is not measured. As with Mae Klong there is no status colour and no alert; levels are stated as facts, including "above the bank" where the source's bank height says so.
 
 ## User Stories
 
-1. As a resident of the village, I want a page for my village separate from the Mae Klong page, so that I see only the gauges relevant to me.
+1. As a resident of the area, I want a page for my area separate from the Mae Klong page, so that I see only the gauges relevant to me.
 2. As a resident, I want the page to state plainly that คลองบางค้อ itself has no gauge, so that I do not mistake a nearby gauge's level for the canal's level.
-3. As a resident, I want each gauge labelled with its waterway and its distance or relation to the village, so that I can judge how much it says about my street.
+3. As a resident, I want each gauge labelled with its waterway and its distance or relation to the area, so that I can judge how much it says about my street.
 4. As a resident, I want to see nearby gauges side by side without one being the "headline", so that the page does not claim more certainty than the data gives.
 5. As a resident, I want each gauge's current level in m MSL with the source's own timestamp, so that I know how fresh it is.
 6. As a resident, I want a gauge older than 6 hours flagged "ข้อมูลอาจไม่อัพเดทล่าสุด", so that stale data is never read as current.
@@ -50,7 +50,7 @@ Add a second **Site** to the existing repo and Collector, with its own page. The
 - **Two Sites, one repo.** Mae Klong stays as is. Bang Kruai is a second Site with its own page, sharing the Collector, the parse functions and the data folder. The repo is not renamed now; revisit after the page is live.
 - **Site tag on stations.** Each tracked gauge in the Collector's station list carries a Site. Site membership lives in one place and both the Collector and the pages read from it. The Mae Klong Site's existing stations are tagged with the Mae Klong Site and their history files are untouched.
 - **Stations for the Bang Kruai Site** (ThaiWater `station.id`, re-verify by name when adding): BKK003 คลองมหาสวัสดิ บางกรวย-สวนผัก (5), C.12 สามเสน (2599), CPY014 สะพานนวลฉวี ปากเกร็ด (26), CPY015 สะพานกรุงเทพ (4), C.13 ท้ายเขื่อนเจ้าพระยา (2744). All are in the feed already fetched by the existing river Source, so no new Source is added. Optional canal-adjacent gauges (BKK018, BKK019, VLGE20) are out of scope unless the maintainer asks.
-- **Proxy gauges, no headline.** The page shows the five gauges equally, each with a label for its waterway and its relation to the village (for example "คลองมหาสวัสดิ์ · อยู่ห่างประมาณ 4 กม." and "แม่น้ำเจ้าพระยา"). BKK003 is geocoded by the feed to Taling Chan, Bangkok, so labels must not imply that any gauge is in the village.
+- **Proxy gauges, no headline.** The page shows the five gauges equally, each with a label for its waterway and its relation to the area (for example "คลองมหาสวัสดิ์ · อยู่ห่างประมาณ 4 กม." and "แม่น้ำเจ้าพระยา"). BKK003 is geocoded by the feed to Taling Chan, Bangkok, so labels must not imply that any gauge is in the area.
 - **Fixed note.** A permanent note near the top states that คลองบางค้อ has no gauge and that the levels shown are from nearby gauges. It is not dismissible and not conditional.
 - **Status stays neutral.** No published warning or critical level exists for these gauges, so Status is neutral, per the glossary. C.13's `critical_level_m` equals its bank height and is not treated as a threshold unless the feed publishes both thresholds for it (existing rule: both must be present).
 - **Bank comparison as a fact.** The parsed record already carries bank height. The page shows the level relative to the bank ("สูงกว่าตลิ่ง" / "ต่ำกว่าตลิ่ง" with the difference in metres), computed from level and bank height, with no colour. It is not a Status and is not described as a flood level. Note: at spec time BKK003 and CPY014 were at or slightly above their banks according to the feed's own comparison, so this wording will be visible immediately.
@@ -78,7 +78,7 @@ Add a second **Site** to the existing repo and Collector, with its own page. The
 ## Out of Scope
 
 - Alerts of any kind.
-- A status colour or any flood threshold, including a user-chosen "your level" (deferred until the maintainer knows the level at which water reaches the village).
+- A status colour or any flood threshold, including a user-chosen "your level" (deferred until the maintainer knows the level at which water reaches the area).
 - A sea-level (Tide) source, since there is no JSON endpoint; only a page with HTML.
 - Bhumibol and Sirikit dam data on the Bang Kruai page.
 - A flood travel-time estimate from C.13 to Bang Kruai (no primary source).
