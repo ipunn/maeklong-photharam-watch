@@ -16,7 +16,7 @@ The repo serves two watched places (**Sites**), sharing one Collector and one `d
 - `bangkruai.html` — พื้นที่ บางกรวย, บางคูเวียง (อ.บางกรวย, นนทบุรี). **คลองบางค้อ, the canal nearest
   the area, has no gauge**, so the page shows nearby *proxy gauges* side by side with no headline:
   BKK003 (คลองมหาสวัสดิ์), C.12, CPY014, CPY015 (Chao Phraya, tidal) and C.13 ท้ายเขื่อนเจ้าพระยา
-  (river discharge below the barrage, not a dam release). No status colour; the only red is the page's own alert when a gauge is 1 m or more above its bank (a maintainer-chosen rule, labelled as not official). Tidal
+  (river discharge below the barrage, not a dam release). No status colour; the only red is the page's own alert when BKK003 is 1 m or more above its bank (a maintainer-chosen rule, labelled as not official). Tidal
   gauges show each Bangkok day's high and low instead of a rising/falling arrow. Levels are stated
   against the source's bank height ("สูงกว่า/ต่ำกว่าตลิ่ง"), which is a fact, not a flood level.
 

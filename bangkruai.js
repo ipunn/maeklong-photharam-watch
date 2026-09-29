@@ -12,7 +12,7 @@
   // Taling Chan, so nothing here implies a gauge is in the area. Distances are rough
   // straight-line estimates from the middle of บางกรวย–บางคูเวียง.
   const LABELS = {
-    5: { name: "คลองมหาสวัสดิ์ บางกรวย-สวนผัก", code: "BKK003", role: "จุดวัดที่ใกล้พื้นที่ที่สุด · ห่างประมาณ 4 กม.", type: "จุดวัดระดับน้ำในคลอง (ขึ้น–ลงตามน้ำทะเล)" },
+    5: { name: "คลองมหาสวัสดิ์ บางกรวย-สวนผัก", code: "BKK003", alert: true, role: "จุดวัดที่ใกล้พื้นที่ที่สุด · ห่างประมาณ 4 กม.", type: "จุดวัดระดับน้ำในคลอง (ขึ้น–ลงตามน้ำทะเล)" },
     2744: { name: "ท้ายเขื่อนเจ้าพระยา", code: "C.13", role: "อ.สรรพยา จ.ชัยนาท · ต้นน้ำห่างมาก", type: "จุดวัดในแม่น้ำเจ้าพระยา", discharge: true },
     26: { name: "สะพานนวลฉวี ปากเกร็ด", code: "CPY014", role: "อ.ปากเกร็ด นนทบุรี · ห่างประมาณ 18 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
     2599: { name: "สามเสน", code: "C.12", role: "เขตดุสิต กรุงเทพฯ · ห่างประมาณ 11 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
@@ -65,15 +65,18 @@
   // threshold, and the page says so wherever it shows red.
   const ALERT_MARGIN_M = 1;
   const ALERT_NOTE = `เกณฑ์เตือนที่ตั้งเองของเว็บนี้ (สูงกว่าตลิ่งตั้งแต่ ${ALERT_MARGIN_M} ม.) ไม่ใช่เกณฑ์ทางการ`;
+  // Only gauges flagged `alert` in LABELS can raise it: BKK003 is the one near the area; the
+  // others are context, and a red banner for a gauge 11-150 km away would mislead.
+  const alerts = (stationId, level, bank) => LABELS[stationId].alert === true && aboveBankAlert(level, bank, ALERT_MARGIN_M);
   const BAR_BELOW_M = 0.75;
   const BAR_ABOVE_M = 0.75;
-  function bankHtml(level, bank) {
+  function bankHtml(stationId, level, bank) {
     const c = bankComparison(level, bank);
     if (!c) return `<div class="flow-meta">ไม่มีข้อมูลความสูงตลิ่ง</div>`;
     const pill =
       c.direction === "at"
         ? `<span class="bank-pill" data-side="at">■ เท่ากับตลิ่ง</span>`
-        : `<span class="bank-pill" data-side="${c.direction}"${aboveBankAlert(level, bank, ALERT_MARGIN_M) ? ' data-alert="true"' : ""}>${c.direction === "above" ? "▲ สูงกว่า" : "▼ ต่ำกว่า"}ตลิ่ง ${c.diffM.toFixed(2)} ม.</span>`;
+        : `<span class="bank-pill" data-side="${c.direction}"${alerts(stationId, level, bank) ? ' data-alert="true"' : ""}>${c.direction === "above" ? "▲ สูงกว่า" : "▼ ต่ำกว่า"}ตลิ่ง ${c.diffM.toFixed(2)} ม.</span>`;
     const span = BAR_BELOW_M + BAR_ABOVE_M;
     const pct = (m) => Math.min(100, Math.max(0, ((m - (bank - BAR_BELOW_M)) / span) * 100));
     return `<div class="flow-meta bank-row">${pill} <span class="unit">ตลิ่ง ${bank.toFixed(2)} ม.รทก.</span></div>
@@ -83,7 +86,7 @@
         <span class="bank-dot" data-side="${c.direction}" style="left:${pct(level).toFixed(1)}%"></span>
       </div>
       <div class="bank-scale"><span>${level < bank - BAR_BELOW_M ? "◀ เกินสเกล" : `${BAR_BELOW_M} ม.ใต้ตลิ่ง`}</span><span>ตลิ่ง</span><span>${level > bank + BAR_ABOVE_M ? "เกินสเกล ▶" : `${BAR_ABOVE_M} ม.เหนือตลิ่ง`}</span></div>${
-        aboveBankAlert(level, bank, ALERT_MARGIN_M) ? `<div class="alert-note">⚠ สูงกว่าตลิ่งเกิน ${ALERT_MARGIN_M} ม. <span class="unit">· ${ALERT_NOTE}</span></div>` : ""
+        alerts(stationId, level, bank) ? `<div class="alert-note">⚠ สูงกว่าตลิ่งเกิน ${ALERT_MARGIN_M} ม. <span class="unit">· ${ALERT_NOTE}</span></div>` : ""
       }`;
   }
 
@@ -169,10 +172,10 @@
         ? `<div class="flow-value"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ${latest.dischargeM3s.toLocaleString("en")} <span class="unit">ลบ.ม./วินาที</span></div>
            <div class="flow-meta">วัดท้ายเขื่อนทดน้ำ เป็นอัตราการไหลของแม่น้ำ ไม่ใช่อัตราระบายของเขื่อน</div>`
         : "";
-    return `<li class="flow-node${stale ? " flow-stale" : ""}${aboveBankAlert(latest.levelMsl, latest.bankMsl, ALERT_MARGIN_M) ? " flow-alert" : ""}">${type}<div class="flow-name">${title}</div>
+    return `<li class="flow-node${stale ? " flow-stale" : ""}${alerts(station.id, latest.levelMsl, latest.bankMsl) ? " flow-alert" : ""}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
-      ${bankHtml(latest.levelMsl, latest.bankMsl)}
+      ${bankHtml(station.id, latest.levelMsl, latest.bankMsl)}
       ${discharge}
       ${station.tidal ? dailyHtml(d.summary.days) : trendHtml(d.summary.recent) + longTrendHtml(d.summary.recent)}
       <div class="flow-meta" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div></div>
@@ -209,7 +212,7 @@
       .filter(Boolean);
     const staleCount = chaoPhraya.filter(({ d }) => d.summary.latest && !(ageMinutes(d.summary.latest.updatedAt) <= STALE_MINUTES)).length;
     const alerting = [...stations.values()]
-      .filter((st) => { const l = data.get(st.id).summary.latest; return l && aboveBankAlert(l.levelMsl, l.bankMsl, ALERT_MARGIN_M); })
+      .filter((st) => { const l = data.get(st.id).summary.latest; return l && alerts(st.id, l.levelMsl, l.bankMsl); })
       .map((st) => LABELS[st.id].name);
     const alertBanner = alerting.length
       ? `<div class="alert-banner" role="alert">⚠ ระดับน้ำสูงกว่าตลิ่งเกิน ${ALERT_MARGIN_M} ม.: ${alerting.join(" · ")}<div class="unit">${ALERT_NOTE} · โปรดติดตามประกาศทางการ</div></div>`
