@@ -115,3 +115,9 @@ h1 {
   padding: 24px 0;
   text-align: center;
 }
+
+.station-role {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin-left: 6px;
+}

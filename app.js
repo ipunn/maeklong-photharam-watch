@@ -5,7 +5,11 @@
 (function () {
   const STALE_MINUTES = 60; // a river gauge reading older than this is flagged, not hidden
 
-  const STATIONS = [{ file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)" }];
+  // Upstream first, so the two cards read top-to-bottom as the river flows.
+  const STATIONS = [
+    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง (อ.บ้านโป่ง)", role: "ต้นน้ำ" },
+    { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ" },
+  ];
 
   function ageMinutes(iso) {
     const ms = new Date(iso).getTime();
@@ -52,7 +56,7 @@
     </svg>`;
   }
 
-  async function loadStation({ file, name }) {
+  async function loadStation({ file, name, role }) {
     const res = await fetch(file, { cache: "no-store" });
     if (!res.ok) throw new Error(`${file} -> HTTP ${res.status}`);
     const history = await res.json();
@@ -62,7 +66,7 @@
     card.className = "station-card";
 
     if (!latest) {
-      card.innerHTML = `<div class="station-header"><span class="station-name">${name}</span></div>
+      card.innerHTML = `<div class="station-header"><span class="station-name">${name} <span class="station-role">${role}</span></span></div>
         <div class="chart-empty">ยังไม่มีข้อมูล</div>`;
       return card;
     }
@@ -73,7 +77,7 @@
 
     card.innerHTML = `
       <div class="station-header">
-        <span class="station-name">${name}</span>
+        <span class="station-name">${name} <span class="station-role">${role}</span></span>
         <span class="status-dot" data-status="${latest.status || ""}" title="${statusLabel}"></span>
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
@@ -91,7 +95,7 @@
       } catch (err) {
         const card = document.createElement("div");
         card.className = "station-card";
-        card.innerHTML = `<div class="station-header"><span class="station-name">${station.name}</span></div>
+        card.innerHTML = `<div class="station-header"><span class="station-name">${station.name} <span class="station-role">${station.role}</span></span></div>
           <div class="chart-empty">โหลดข้อมูลไม่สำเร็จ: ${err.message}</div>`;
         root.appendChild(card);
       }

@@ -11,17 +11,24 @@ rather than being special-cased.
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The Ban Pong-area station is fetched, filtered, and parsed via the same
+- [x] The Ban Pong-area station is fetched, filtered, and parsed via the same
       `parseWaterLevelRecord` function from ticket 01 (no duplicate/forked
       parsing logic for this second station)
-- [ ] The 15-minute cron Action appends this station's reading to the
+- [x] The 15-minute cron Action appends this station's reading to the
       history file each run, alongside โพธาราม's row (both present after
       every run)
-- [ ] The site renders this station's current level, age-since-update,
+- [x] The site renders this station's current level, age-since-update,
       status color (neutral, since this station's thresholds are also `null`
       at spec time), and its own trend chart, positioned so the two stations
       read as an upstream/downstream bracket rather than two unrelated
       entries
-- [ ] Existing โพธาราม data/behavior from ticket 01 is unaffected
+- [x] Existing โพธาราม data/behavior from ticket 01 is unaffected
+
+## Comments
+
+Spec's station id 505018 is now "บ้านปากแซง" (Sai Yok, 54 m MSL) — wrong. Used
+832066 "สะพานค่ายหลวง" (Ban Pong, RID K.55A), the name this ticket cites. Note it
+reports roughly hourly, vs ~10 min for โพธาราม. Alternative if preferred: 709
+"บ้านโป่ง" (HII, RAJ002).

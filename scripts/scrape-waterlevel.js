@@ -16,10 +16,13 @@ const { parseWaterLevelRecord, deriveStatus } = require("../parse.js");
 // ADR-0004). Can change or break without notice; no SLA.
 const WATERLEVEL_URL = "https://api-v3.thaiwater.net/api/v1/thaiwater30/public/waterlevel_load";
 
-// Tracked stations, by ThaiWater station id. Only เจ็ดเสมียน/โพธาราม is
-// wired in for this ticket; the upstream Ban Pong-area bracket station is
-// added in a later ticket.
-const STATIONS = [{ id: 710, file: "photharam.json" }];
+// Tracked stations, by ThaiWater station id: the upstream/downstream pair
+// bracketing the user's coordinate. 832066 (สะพานค่ายหลวง, Ban Pong) is the
+// upstream one; 505018 named in the spec is now a Sai Yok station.
+const STATIONS = [
+  { id: 832066, file: "khai-luang.json" },
+  { id: 710, file: "photharam.json" },
+];
 
 async function main() {
   const res = await fetch(WATERLEVEL_URL, { headers: { Accept: "application/json" } });

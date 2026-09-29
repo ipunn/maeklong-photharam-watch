@@ -20,6 +20,32 @@ const RAW_PHOTHARAM = {
   },
 };
 
+// A real record captured from the same feed for station id 832066
+// ("สะพานค่ายหลวง", Ban Pong) — the upstream bracket station. Deliberately run
+// through the same parseWaterLevelRecord as โพธาราม, no station-specific parsing.
+const RAW_KHAI_LUANG = {
+  waterlevel_datetime: "2026-09-29 12:00",
+  waterlevel_msl: "9.29",
+  station: {
+    id: 832066,
+    tele_station_name: { th: "สะพานค่ายหลวง" },
+    min_bank: 9,
+    warning_level_m: null,
+    critical_level_m: null,
+  },
+};
+
+test("parseWaterLevelRecord parses the upstream Ban Pong station with the same function, neutral thresholds", () => {
+  const parsed = parseWaterLevelRecord(RAW_KHAI_LUANG);
+  assert.equal(parsed.stationId, 832066);
+  assert.equal(parsed.name, "สะพานค่ายหลวง");
+  assert.equal(parsed.levelMsl, 9.29);
+  assert.equal(parsed.bankMsl, 9);
+  assert.equal(parsed.updatedAt, "2026-09-29T12:00:00+07:00");
+  assert.equal(parsed.thresholds, null);
+  assert.equal(deriveStatus(parsed.levelMsl, parsed.thresholds), null);
+});
+
 test("parseWaterLevelRecord extracts stationId, name, levelMsl, bankMsl, updatedAt", () => {
   const parsed = parseWaterLevelRecord(RAW_PHOTHARAM);
   assert.equal(parsed.stationId, 710);
