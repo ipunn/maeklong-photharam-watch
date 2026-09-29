@@ -267,7 +267,7 @@
   // Every hourly chart shares ONE time axis: the right edge is the newest data hour across
   // all sources, so the same x position means the same clock time in every box. A series
   // whose newest reading is older simply stops short and is left blank up to the edge.
-  const CHART_WINDOW_H = 12;
+  const CHART_WINDOW_H = 6;
   let axisEndT = null;
   async function loadAxisEnd() {
     const files = [
