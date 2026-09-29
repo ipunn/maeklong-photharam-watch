@@ -717,3 +717,34 @@ h1 {
     display: none;
   }
 }
+
+/* collapsed reading guide */
+.howto {
+  margin: 0 0 12px;
+}
+
+.howto ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  line-height: 1.55;
+}
+
+.stations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin: 8px 0 4px;
+}
+
+.stations-table th,
+.stations-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-note {
+  font-size: 0.75rem;
+  margin: 0 0 8px;
+}

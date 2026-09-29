@@ -9,10 +9,10 @@
 
   // Upstream first, so the cards read top-to-bottom as the water flows down to the user.
     const STATIONS = [
-    { file: "data/pak-saeng.json", name: "บ้านปากแซง K.58 (แควน้อย, อ.ไทรโยค)", role: "ต้นน้ำไกล", staleMinutes: STALE_MINUTES },
-    { file: "data/wang-khanai.json", name: "บ้านวังขนาย K.11A (แม่กลอง, อ.ท่าม่วง)", role: "ท้ายเขื่อนแม่กลอง", staleMinutes: STALE_MINUTES },
-    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง K.55A (แม่กลอง, อ.บ้านโป่ง)", role: "ต้นน้ำ", staleMinutes: STALE_MINUTES },
-    { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ", staleMinutes: STALE_MINUTES },
+    { file: "data/pak-saeng.json", name: "บ้านปากแซง", role: "", staleMinutes: STALE_MINUTES },
+    { file: "data/wang-khanai.json", name: "บ้านวังขนาย", role: "ท้ายเขื่อนแม่กลอง", staleMinutes: STALE_MINUTES },
+    { file: "data/khai-luang.json", name: "สะพานค่ายหลวง", role: "", staleMinutes: STALE_MINUTES },
+    { file: "data/photharam.json", name: "โพธาราม", role: "", staleMinutes: STALE_MINUTES },
   ];
 
   // One fetch per history file, shared by the river-line overview and the cards.
@@ -63,6 +63,15 @@
     return `${fmt(dateOpts).format(ms)} ${clock} น.`;
   }
 
+  // Compact "as of": time only when it is today in Bangkok, otherwise the full date+time.
+  function formatShortTime(iso) {
+    const ms = new Date(iso).getTime();
+    if (Number.isNaN(ms)) return null;
+    const day = (t) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(t);
+    if (day(ms) !== day(Date.now())) return formatReportTime(iso);
+    return new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ms) + " น.";
+  }
+
   const STATUS_LABEL = {
     red: "วิกฤต",
     yellow: "เฝ้าระวัง",
@@ -105,7 +114,7 @@
   }
 
   function stationNameHtml(name, role) {
-    return `<span class="station-name">${name} <span class="station-role">${role}</span></span>`;
+    return `<span class="station-name">${name}${role ? ` <span class="station-role">${role}</span>` : ""}</span>`;
   }
 
   async function loadStation({ file, name, role, staleMinutes }) {
@@ -227,7 +236,7 @@
       ],
     },
   ];
-  const MERGE_TEXT = "<span class=\"merge-lead\">แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → </span>ไหลผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ จึงไม่แสดง) → แล้วผ่านจุดวัดด้านล่างนี้ตามลำดับ ลงมาหาพื้นที่ของคุณ";
+  const MERGE_TEXT = "<span class=\"merge-lead\">แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → </span>ผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ) แล้วถึงจุดวัดด้านล่าง";
   // Phones stack the two branches, which reads as one line. This small Y diagram shows
   // two rivers converging into one. Hidden on wide screens, where the branches sit side
   // by side and a real join bar already shows it.
@@ -252,7 +261,7 @@
   function trendHtml(t, kind) {
     if (!t) return `<span class="trend" data-dir="none">ยังไม่มีข้อมูลพอเทียบแนวโน้ม</span>`;
     const [arrow, word] = TREND_TEXT[t.direction];
-    const span = `ใน ${t.spanHours.toFixed(1)} ชม.ที่ผ่านมา`;
+    const span = `ใน ${t.spanHours.toFixed(1)} ชม.`;
     if (t.direction === "steady") return `<span class="trend" data-dir="steady">${arrow} ${word} ${span}</span>`;
     // The net change can hide a late reversal, so say so when the newest reading
     // moved against it (by at least the source's own 1 cm resolution).
@@ -260,19 +269,19 @@
     const stepArrow = t.lastDelta < 0 ? "▼" : "▲";
     if (kind === "dam") {
       const note = against && Math.abs(t.lastDelta) >= RELEASE_STEADY_M3S
-        ? ` <span class="trend-note">· แต่รอบล่าสุด ${stepArrow} ${Math.abs(Math.round(t.lastDelta))} ลบ.ม./วินาที</span>` : "";
+        ? ` <span class="trend-note">· รอบล่าสุด ${stepArrow} ${Math.abs(Math.round(t.lastDelta))} ลบ.ม./วินาที</span>` : "";
       return `<span class="trend" data-dir="${t.direction}">${arrow} อัตราระบาย${word} ${Math.abs(Math.round(t.delta))} ลบ.ม./วินาที ${span}</span>${note}`;
     }
     const cm = Math.abs(t.delta) * 100;
     const perHour = cm / t.spanHours;
     const note = against && Math.round(Math.abs(t.lastDelta) * 100) >= 1
-      ? ` <span class="trend-note">· แต่รอบล่าสุด ${stepArrow} ${Math.round(Math.abs(t.lastDelta) * 100)} ซม.</span>` : "";
-    return `<span class="trend" data-dir="${t.direction}">${arrow} ${word}สุทธิ ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>${note}`;
+      ? ` <span class="trend-note">· รอบล่าสุด ${stepArrow} ${Math.round(Math.abs(t.lastDelta) * 100)} ซม.</span>` : "";
+    return `<span class="trend" data-dir="${t.direction}">${arrow} ${word} ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>${note}`;
   }
 
   // Small trend chart: x is real time (not index), only distinct source timestamps,
   // last 24 h. Caption prints the real span and first -> last so it can't overstate.
-  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false) {
+  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false) {
     const all = seriesOf(rows, valueKey, timeKey);
     const latestT = all.length ? all[all.length - 1].t : 0;
     const pts = all.filter((p) => p.t >= latestT - windowHours * 3600000);
@@ -317,15 +326,15 @@
           .map((k) => `<span class="tick" style="left:${((k.x / w) * 100).toFixed(2)}%">${String(k.hour).padStart(2, "0")}:00</span>`)
           .join("")}</div>`
       : "";
-    return `<div class="spark"><div class="spark-label">${label}</div>
+    return `<div class="spark">${compact ? "" : `<div class="spark-label">${label}</div>`}
       <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${label}">
         ${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" />
       </svg>${axis}
-      <div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div></div>`;
+      ${compact ? "" : `<div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div>`}</div>`;
   }
 
   function freshnessHtml(d) {
-    const age = d.asOf ? `ข้อมูล ณ ${d.asOf} (ผ่านมา ${formatDuration(d.mins)})` : "ไม่ทราบเวลาของข้อมูล";
+    const age = d.asOf ? `ข้อมูล ${d.asOf} · ${formatDuration(d.mins)}ที่แล้ว` : "ไม่ทราบเวลาของข้อมูล";
     const warn = d.stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : "";
     return `<div class="flow-meta" data-stale="${d.stale}">${age}${warn}</div>`;
   }
@@ -336,7 +345,7 @@
     }
     const type = `<div class="flow-type" data-type="${node.kind}">${TYPE_LABEL[node.kind]}</div>`;
     const st = node.station;
-    const title = node.kind === "dam" ? node.name : `${st.name} <span class="flow-role">${st.role}</span>`;
+    const title = node.kind === "dam" ? node.name : `${st.name}${st.role ? ` <span class="flow-role">${st.role}</span>` : ""}`;
     if (!d) {
       return `<li class="flow-node">${type}<div class="flow-name">${title}</div><div class="flow-meta">ไม่มีข้อมูล</div></li>`;
     }
@@ -346,7 +355,7 @@
       const cap = d.capacity
         ? `<div class="flow-value"><span class="flow-label">น้ำในเขื่อน</span>
              <span class="band" data-band="${band.key}">${d.capacity.percent.toFixed(1)} <span class="unit">% ของความจุ</span></span></div>
-           <div class="flow-meta"><span class="band-tag" data-band="${band.key}">${band.label}</span> ตามเกณฑ์กรมชลประทาน · รับน้ำได้อีก ≈ ${Math.round(d.capacity.remainingMcm)} ล้าน ลบ.ม.</div>`
+           <div class="flow-meta"><span class="band-tag" data-band="${band.key}">${band.label}</span> · รับน้ำได้อีก ≈ ${Math.round(d.capacity.remainingMcm).toLocaleString("en-US")} ล้าน ลบ.ม.</div>`
         : `<div class="flow-meta">ไม่มีข้อมูลความจุรายชั่วโมง</div>`;
       const release = d.latest.releaseM3s == null ? "ไม่มีข้อมูล" : `≈ ${d.latest.releaseM3s} <span class="unit">ลบ.ม./วินาที</span>`;
       return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
@@ -356,9 +365,9 @@
     }
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
-      <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเลปานกลาง</span></div>
+      <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
       <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${freshnessHtml(d)}</div>
-      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, 12, true)}</div></div></li>`;
+      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, 12, true, true)}</div></div></li>`;
   }
 
   async function nodeData(node) {
@@ -378,7 +387,7 @@
         capacity,
         mins,
         stale: !(mins <= STALE_MINUTES),
-        asOf: latest.reportedAt ? formatReportTime(latest.reportedAt) : null,
+        asOf: latest.reportedAt ? formatShortTime(latest.reportedAt) : null,
       };
     }
     const rows = await getHistory(node.station.file).catch(() => []);
@@ -391,7 +400,7 @@
       trend: trendOf(rows, "levelMsl", "updatedAt", TREND_WINDOW_H, GAUGE_STEADY_M),
       mins,
       stale: !(mins <= STALE_MINUTES),
-      asOf: latest.updatedAt ? formatReportTime(latest.updatedAt) : null,
+      asOf: latest.updatedAt ? formatShortTime(latest.updatedAt) : null,
     };
   }
 
@@ -409,7 +418,7 @@
     // One continuous line per river: each branch's line runs down into the merge point,
     // and the Mae Klong line continues from it — so nothing looks disconnected.
     const branch = (b, i) => `<div class="branch" data-branch="${i}"><div class="branch-title">${b.title}</div>
-        <ol class="flow">${items(b.nodes)}<li class="flow-end">↓ ไหลไปบรรจบกันที่ จ.กาญจนบุรี</li></ol></div>`;
+        <ol class="flow">${items(b.nodes)}</ol></div>`;
     root.innerHTML = `<div class="flow-summary">${summary}</div>
       <div class="branches">${BRANCHES.map(branch).join("")}</div>
       ${MERGE_DIAGRAM}
@@ -430,7 +439,7 @@
       el.innerHTML = `<span class="health-warn">ไม่ทราบเวลาที่ตัวดึงข้อมูลอัตโนมัติทำงานล่าสุด — ข้อมูลอาจไม่อัพเดทล่าสุด</span>`;
       return;
     }
-    const when = formatReportTime(h.latest);
+    const when = formatShortTime(h.latest);
     if (h.status === "stale") {
       el.innerHTML = `<span class="health-warn">ตัวดึงข้อมูลอัตโนมัติไม่ทำงานมาแล้ว ${formatDuration(h.ageMinutes)} (ล่าสุด ${when}) — ข้อมูลด้านล่างอาจไม่อัพเดทล่าสุด</span>`;
       return;
