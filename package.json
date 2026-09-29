@@ -1,0 +1,9 @@
+{
+  "name": "maeklong-photharam-watch",
+  "private": true,
+  "description": "Water-level and upstream-reservoir trend monitor for the Mae Klong river near Photharam, Ratchaburi.",
+  "scripts": {
+    "test": "node --test",
+    "scrape": "node scripts/scrape-waterlevel.js"
+  }
+}
