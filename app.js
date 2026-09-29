@@ -227,7 +227,7 @@
       ],
     },
   ];
-  const MERGE_TEXT = "🌊 แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> — จุดถัดไปอยู่บนแม่น้ำสายเดียวกัน ไหลลงมาหาพื้นที่ของคุณ";
+  const MERGE_TEXT = "🌊 แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → ไหลผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ จึงไม่แสดง) → แล้วผ่านจุดวัดด้านล่างนี้ตามลำดับ ลงมาหาพื้นที่ของคุณ";
   const MAIN = [
     { kind: "gauge", station: STATIONS[1] },
     { kind: "gauge", station: STATIONS[2] },
@@ -245,12 +245,58 @@
     const [arrow, word] = TREND_TEXT[t.direction];
     const span = `ใน ${t.spanHours.toFixed(1)} ชม.ที่ผ่านมา`;
     if (t.direction === "steady") return `<span class="trend" data-dir="steady">${arrow} ${word} ${span}</span>`;
+    // The net change can hide a late reversal, so say so when the newest reading
+    // moved against it (by at least the source's own 1 cm resolution).
+    const against = t.direction === "rising" ? t.lastDelta < 0 : t.lastDelta > 0;
+    const stepArrow = t.lastDelta < 0 ? "▼" : "▲";
     if (kind === "dam") {
-      return `<span class="trend" data-dir="${t.direction}">${arrow} อัตราระบาย${word} ${Math.abs(Math.round(t.delta))} ลบ.ม./วินาที ${span}</span>`;
+      const note = against && Math.abs(t.lastDelta) >= RELEASE_STEADY_M3S
+        ? ` <span class="trend-note">· แต่รอบล่าสุด ${stepArrow} ${Math.abs(Math.round(t.lastDelta))} ลบ.ม./วินาที</span>` : "";
+      return `<span class="trend" data-dir="${t.direction}">${arrow} อัตราระบาย${word} ${Math.abs(Math.round(t.delta))} ลบ.ม./วินาที ${span}</span>${note}`;
     }
     const cm = Math.abs(t.delta) * 100;
     const perHour = cm / t.spanHours;
-    return `<span class="trend" data-dir="${t.direction}">${arrow} ${word} ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>`;
+    const note = against && Math.round(Math.abs(t.lastDelta) * 100) >= 1
+      ? ` <span class="trend-note">· แต่รอบล่าสุด ${stepArrow} ${Math.round(Math.abs(t.lastDelta) * 100)} ซม.</span>` : "";
+    return `<span class="trend" data-dir="${t.direction}">${arrow} ${word}สุทธิ ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>${note}`;
+  }
+
+  // Small trend chart: x is real time (not index), only distinct source timestamps,
+  // last 24 h. Caption prints the real span and first -> last so it can't overstate.
+  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange) {
+    const all = seriesOf(rows, valueKey, timeKey);
+    const latestT = all.length ? all[all.length - 1].t : 0;
+    const pts = all.filter((p) => p.t >= latestT - 24 * 3600000);
+    if (pts.length < 2) {
+      return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
+    }
+    const w = 300;
+    const h = 56;
+    const pad = 6;
+    const t0 = pts[0].t;
+    const tN = pts[pts.length - 1].t;
+    const vs = pts.map((p) => p.v);
+    // Never auto-zoom below a meaningful range, or a 1 cm wiggle looks like a collapse.
+    let min = Math.min(...vs);
+    let max = Math.max(...vs);
+    if (max - min < minRange) {
+      const mid = (min + max) / 2;
+      min = mid - minRange / 2;
+      max = mid + minRange / 2;
+    }
+    const range = max - min;
+    const xy = pts.map((p) => [
+      pad + ((p.t - t0) / (tN - t0)) * (w - pad * 2),
+      h - pad - ((p.v - min) / range) * (h - pad * 2),
+    ]);
+    const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const [ex, ey] = xy[xy.length - 1];
+    const spanH = (tN - t0) / 3600000;
+    return `<div class="spark"><div class="spark-label">${label}</div>
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${label}">
+        <polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" />
+      </svg>
+      <div class="spark-cap">${spanH.toFixed(1)} ชม.: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div></div>`;
   }
 
   function freshnessHtml(d) {
@@ -271,18 +317,28 @@
     }
     const cls = d.stale ? "flow-node flow-stale" : "flow-node";
     if (node.kind === "dam") {
+      const band = d.capacity ? reservoirBand(d.capacity.percent) : null;
       const cap = d.capacity
-        ? `<div class="flow-value"><span class="flow-label">น้ำในเขื่อน</span> ${d.capacity.percent.toFixed(1)} <span class="unit">% ของความจุ</span></div>
-           <div class="flow-meta">รับน้ำได้อีก ≈ ${Math.round(d.capacity.remainingMcm)} ล้าน ลบ.ม.</div>`
+        ? `<div class="flow-value"><span class="flow-label">น้ำในเขื่อน</span>
+             <span class="band" data-band="${band.key}">${d.capacity.percent.toFixed(1)} <span class="unit">% ของความจุ</span></span></div>
+           <div class="flow-meta"><span class="band-tag" data-band="${band.key}">${band.label}</span> ตามเกณฑ์กรมชลประทาน · รับน้ำได้อีก ≈ ${Math.round(d.capacity.remainingMcm)} ล้าน ลบ.ม.</div>`
         : `<div class="flow-meta">ไม่มีข้อมูลความจุรายชั่วโมง</div>`;
       const release = d.latest.releaseM3s == null ? "ไม่มีข้อมูล" : `≈ ${d.latest.releaseM3s} <span class="unit">ลบ.ม./วินาที</span>`;
-      return `<li class="${cls}">${type}<div class="flow-name">${title}</div>${cap}
+      const sparks = [
+        d.capacityRows ? sparklineHtml(d.capacityRows, "pct", "reportedAt", "% ความจุ", "%", 1, 1) : "",
+        sparklineHtml(d.rows, "releaseM3s", "reportedAt", "อัตราระบาย", "ลบ.ม./วินาที", 0, 50),
+      ].join("");
+      return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
+        <div class="flow-body"><div class="flow-text">${cap}
         <div class="flow-value"><span class="flow-label">ระบายน้ำลงแม่น้ำ</span> ${release}</div>
-        <div class="flow-meta">${trendHtml(d.trend, "dam")}</div>${freshnessHtml(d)}</li>`;
+        <div class="flow-meta">${trendHtml(d.trend, "dam")}</div>${freshnessHtml(d)}</div>
+        <div class="flow-sparks">${sparks}</div></div></li>`;
     }
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
+      <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเลปานกลาง</span></div>
-      <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${freshnessHtml(d)}</li>`;
+      <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${freshnessHtml(d)}</div>
+      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1)}</div></div></li>`;
   }
 
   async function nodeData(node) {
@@ -294,10 +350,15 @@
       const egat = await getHistory(node.res.file).catch(() => []);
       const egatRow = [...egat].reverse().find((r) => typeof r.storageMcm === "number");
       const mins = ageMinutes(latest.reportedAt);
+      const capacity = egatRow ? damCapacity(latest.storageMcm, egatRow.storageMcm, egatRow.storagePercent) : null;
       return {
         latest,
+        rows,
         trend: trendOf(rows, "releaseM3s", "reportedAt", TREND_WINDOW_H, RELEASE_STEADY_M3S),
-        capacity: egatRow ? damCapacity(latest.storageMcm, egatRow.storageMcm, egatRow.storagePercent) : null,
+        capacity,
+        capacityRows: capacity
+          ? rows.map((r) => ({ reportedAt: r.reportedAt, pct: typeof r.storageMcm === "number" ? (r.storageMcm / capacity.capacityMcm) * 100 : null }))
+          : null,
         mins,
         stale: !(mins <= STALE_MINUTES),
         asOf: latest.reportedAt ? formatReportTime(latest.reportedAt) : null,
@@ -309,6 +370,7 @@
     const mins = ageMinutes(latest.updatedAt);
     return {
       latest,
+      rows,
       trend: trendOf(rows, "levelMsl", "updatedAt", TREND_WINDOW_H, GAUGE_STEADY_M),
       mins,
       stale: !(mins <= STALE_MINUTES),

@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -239,4 +239,49 @@ test("damCapacity returns null when any input is missing or unusable — never g
   assert.equal(damCapacity(8625, null, 96.32), null);
   assert.equal(damCapacity(8625, 8534, 0), null);
   assert.equal(damCapacity(8625, 8534, null), null);
+});
+
+// reservoirBand: the official reservoir-storage status bands (Royal Irrigation Dept,
+// as printed in ThaiWater's report notes): >100 over capacity, >80-100 น้ำมาก,
+// >50-80 น้ำปานกลาง, >30-50 น้ำน้อย, <=30 น้ำน้อยวิกฤต. Boundaries are exclusive-low.
+test("reservoirBand follows the official bands, including the exact boundaries", () => {
+  assert.equal(reservoirBand(100.01).key, "over");
+  assert.equal(reservoirBand(100).key, "high"); // >80-100
+  assert.equal(reservoirBand(97.4).key, "high");
+  assert.equal(reservoirBand(80.01).key, "high");
+  assert.equal(reservoirBand(80).key, "medium"); // >50-80
+  assert.equal(reservoirBand(50.01).key, "medium");
+  assert.equal(reservoirBand(50).key, "low"); // >30-50
+  assert.equal(reservoirBand(30.01).key, "low");
+  assert.equal(reservoirBand(30).key, "critical-low"); // <=30
+  assert.equal(reservoirBand(0).key, "critical-low");
+});
+
+test("reservoirBand labels are the official Thai terms and unknown input is null", () => {
+  assert.equal(reservoirBand(97.4).label, "น้ำมาก");
+  assert.equal(reservoirBand(101).label, "เกินความจุเก็บกัก");
+  assert.equal(reservoirBand(null), null);
+  assert.equal(reservoirBand(NaN), null);
+});
+
+test("seriesOf keeps one point per source timestamp, sorted, dropping non-numeric values", () => {
+  const rows = [row("12:00", 5), row("11:00", 4), row("12:00", 5), row("10:00", null)];
+  const pts = seriesOf(rows, "levelMsl", "updatedAt");
+  assert.deepEqual(pts.map((p) => p.v), [4, 5]);
+  assert.ok(pts[0].t < pts[1].t);
+});
+
+// The net change can hide a reversal: 4.96 -> 5.00 -> 4.99 is "up 3 cm" overall
+// but the latest step is DOWN 1 cm. trendOf exposes that last step so the UI can say so.
+test("trendOf reports the latest step separately, so a late dip is not hidden by the net rise", () => {
+  const rows = [row("12:40", 4.96), row("12:50", 4.98), row("13:00", 4.99), row("13:30", 5.0), row("13:40", 4.99)];
+  const t = trendOf(rows, "levelMsl", "updatedAt", 3, 0.02);
+  assert.equal(t.direction, "rising");
+  assert.equal(Number((t.delta * 100).toFixed(0)), 3);
+  assert.equal(Number((t.lastDelta * 100).toFixed(0)), -1);
+});
+
+test("trendOf lastDelta follows the newest two distinct readings", () => {
+  const t = trendOf([row("10:00", 1), row("11:00", 2), row("12:00", 4)], "levelMsl", "updatedAt", 3, 0.02);
+  assert.equal(t.lastDelta, 2);
 });

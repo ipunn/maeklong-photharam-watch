@@ -151,31 +151,52 @@ function damCapacity(hourlyStorageMcm, egatStorageMcm, egatStoragePercent) {
   };
 }
 
+// Official reservoir-storage status bands by % of capacity (Royal Irrigation
+// Department criteria, as printed in ThaiWater's report notes). Lower bounds are
+// exclusive: exactly 80% is น้ำปานกลาง, exactly 100% is น้ำมาก.
+function reservoirBand(percent) {
+  if (typeof percent !== "number" || !Number.isFinite(percent)) return null;
+  if (percent > 100) return { key: "over", label: "เกินความจุเก็บกัก" };
+  if (percent > 80) return { key: "high", label: "น้ำมาก" };
+  if (percent > 50) return { key: "medium", label: "น้ำปานกลาง" };
+  if (percent > 30) return { key: "low", label: "น้ำน้อย" };
+  return { key: "critical-low", label: "น้ำน้อยวิกฤต" };
+}
+
+// One point per SOURCE timestamp, oldest first (repeated scrapes of one unchanged
+// reading collapse to a single point).
 // How a series moved, using only the readings we have. `timeKey` is the SOURCE's
 // own timestamp (repeated scrapes of one unchanged reading collapse to one point).
 // Compares the newest reading with the oldest one still inside `windowHours`, and
 // reports the real span so the UI never claims "3 h" when only 1 h of data exists.
 // Returns null when there aren't two distinct readings: no data, no trend.
-function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
+function seriesOf(rows, valueKey, timeKey) {
   const byTime = new Map();
   for (const r of rows) {
     const t = new Date(r[timeKey]).getTime();
     if (!Number.isNaN(t) && typeof r[valueKey] === "number") byTime.set(t, r[valueKey]);
   }
-  const points = [...byTime.entries()].sort((a, b) => a[0] - b[0]);
+  return [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => ({ t, v }));
+}
+
+function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
+  const points = seriesOf(rows, valueKey, timeKey).map((p) => [p.t, p.v]);
   if (points.length < 2) return null;
   const [latestT, latestV] = points[points.length - 1];
   const cutoff = latestT - windowHours * 3600000;
   const first = points.find(([t]) => t >= cutoff && t < latestT);
   if (!first) return null;
   const delta = latestV - first[1];
+  const prevV = points[points.length - 2][1];
   return {
     delta,
+    // The newest step on its own: the net change can hide a late reversal.
+    lastDelta: latestV - prevV,
     spanHours: (latestT - first[0]) / 3600000,
     direction: Math.abs(delta) <= tolerance ? "steady" : delta > 0 ? "rising" : "falling",
   };
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

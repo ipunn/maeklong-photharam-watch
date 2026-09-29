@@ -368,7 +368,16 @@ h1 {
 @media (min-width: 760px) {
   .branches {
     grid-template-columns: 1fr 1fr;
-    align-items: start;
+    align-items: stretch;
+  }
+
+  .branch {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .branch .flow {
+    flex: 1;
   }
 }
 
@@ -556,4 +565,114 @@ h1 {
   .flow-main::before {
     top: -18px;
   }
+}
+
+/* ---- node layout: text left, trend charts right (stacked below on phones) ---- */
+.flow-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 16px;
+}
+
+@media (min-width: 620px) {
+  .flow-body {
+    grid-template-columns: 1fr 230px;
+    align-items: start;
+  }
+}
+
+.flow-sparks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spark-label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.spark svg {
+  width: 100%;
+  height: 56px;
+  display: block;
+}
+
+.spark-line {
+  fill: none;
+  stroke: var(--line);
+  vector-effect: non-scaling-stroke;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* zero-length round-capped path = a true circle even though the svg is stretched */
+.spark-dot {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 8;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-cap {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.spark-empty {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  padding: 14px 0;
+}
+
+/* dam capacity colour: the official Royal Irrigation Dept bands. Only the top two
+   bands are warm — the lower ones are drought categories, not flood risk. */
+.band {
+  border-radius: 8px;
+  padding: 0 8px;
+}
+
+.band[data-band="high"] {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.band[data-band="over"] {
+  background: #fecaca;
+  color: #7f1d1d;
+}
+
+.band[data-band="medium"],
+.band[data-band="low"],
+.band[data-band="critical-low"] {
+  background: #e5e7eb;
+  color: var(--text);
+}
+
+.band .unit {
+  color: inherit;
+}
+
+.band-tag {
+  font-weight: 700;
+}
+
+.band-tag[data-band="high"] {
+  color: #b45309;
+}
+
+.band-tag[data-band="over"] {
+  color: #b91c1c;
+}
+
+/* the two upstream branches share a row on wide screens, so their cards stay single-column */
+.branch .flow-body {
+  grid-template-columns: 1fr;
+}
+
+.trend-note {
+  color: var(--text-dim);
+  font-size: 0.8rem;
 }
