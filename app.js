@@ -263,7 +263,7 @@
 
   // Small trend chart: x is real time (not index), only distinct source timestamps,
   // last 24 h. Caption prints the real span and first -> last so it can't overstate.
-  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24) {
+  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false) {
     const all = seriesOf(rows, valueKey, timeKey);
     const latestT = all.length ? all[all.length - 1].t : 0;
     const pts = all.filter((p) => p.t >= latestT - windowHours * 3600000);
@@ -292,10 +292,26 @@
     const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
     const [ex, ey] = xy[xy.length - 1];
     const spanH = (tN - t0) / 3600000;
+    // Hourly ticker: one tick per whole hour (Bangkok is UTC+7, a whole-hour offset).
+    // Only for short windows; labels are HTML so the stretched svg cannot distort them.
+    const HOUR = 3600000;
+    const ticks = [];
+    if (hourlyAxis && spanH <= 24) {
+      for (let t = Math.ceil(t0 / HOUR) * HOUR; t <= tN; t += HOUR) {
+        const frac = (t - t0) / (tN - t0);
+        ticks.push({ x: pad + frac * (w - pad * 2), hour: (Math.floor(t / HOUR) + 7) % 24 });
+      }
+    }
+    const grid = ticks.map((k) => `<line class="spark-grid" x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
+    const axis = ticks.length
+      ? `<div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${ticks
+          .map((k) => `<span class="tick" style="left:${((k.x / w) * 100).toFixed(2)}%">${String(k.hour).padStart(2, "0")}:00</span>`)
+          .join("")}</div>`
+      : "";
     return `<div class="spark"><div class="spark-label">${label}</div>
       <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${label}">
-        <polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" />
-      </svg>
+        ${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" />
+      </svg>${axis}
       <div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div></div>`;
   }
 
@@ -324,21 +340,16 @@
            <div class="flow-meta"><span class="band-tag" data-band="${band.key}">${band.label}</span> ตามเกณฑ์กรมชลประทาน · รับน้ำได้อีก ≈ ${Math.round(d.capacity.remainingMcm)} ล้าน ลบ.ม.</div>`
         : `<div class="flow-meta">ไม่มีข้อมูลความจุรายชั่วโมง</div>`;
       const release = d.latest.releaseM3s == null ? "ไม่มีข้อมูล" : `≈ ${d.latest.releaseM3s} <span class="unit">ลบ.ม./วินาที</span>`;
-      const sparks = [
-        d.capacityRows ? sparklineHtml(d.capacityRows, "pct", "reportedAt", "% ความจุ", "%", 1, 1) : "",
-        sparklineHtml(d.rows, "releaseM3s", "reportedAt", "อัตราระบาย", "ลบ.ม./วินาที", 0, 50),
-      ].join("");
       return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
         <div class="flow-body"><div class="flow-text">${cap}
         <div class="flow-value"><span class="flow-label">ระบายน้ำลงแม่น้ำ</span> ${release}</div>
-        <div class="flow-meta">${trendHtml(d.trend, "dam")}</div>${freshnessHtml(d)}</div>
-        <div class="flow-sparks">${sparks}</div></div></li>`;
+        <div class="flow-meta">${trendHtml(d.trend, "dam")}</div>${freshnessHtml(d)}</div></div></li>`;
     }
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเลปานกลาง</span></div>
       <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${freshnessHtml(d)}</div>
-      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1)}</div></div></li>`;
+      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, 12, true)}</div></div></li>`;
   }
 
   async function nodeData(node) {
@@ -356,9 +367,6 @@
         rows,
         trend: trendOf(rows, "releaseM3s", "reportedAt", TREND_WINDOW_H, RELEASE_STEADY_M3S),
         capacity,
-        capacityRows: capacity
-          ? rows.map((r) => ({ reportedAt: r.reportedAt, pct: typeof r.storageMcm === "number" ? (r.storageMcm / capacity.capacityMcm) * 100 : null }))
-          : null,
         mins,
         stale: !(mins <= STALE_MINUTES),
         asOf: latest.reportedAt ? formatReportTime(latest.reportedAt) : null,

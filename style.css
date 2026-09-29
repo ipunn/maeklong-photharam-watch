@@ -634,3 +634,32 @@ h1 {
 .station-card {
   --line: var(--accent);
 }
+
+/* hourly ticker under the gauge charts */
+.spark-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-axis {
+  position: relative;
+  height: 1rem;
+  margin-top: 2px;
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* phones: keep every hourly tick line, but label every second hour when crowded */
+@media (max-width: 480px) {
+  .spark-axis.dense .tick:nth-child(even) {
+    visibility: hidden;
+  }
+}
