@@ -8,7 +8,7 @@
 // parse.js and is unit tested there. Nothing here is tested directly.
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, parseReservoirRecord } = require("../parse.js");
+const { parseWaterLevelRecord, deriveStatus, parseReservoirRecord, parseReservoirReportDate } = require("../parse.js");
 
 // ThaiWater's own React SPA's underlying data source — public, unauthenticated
 // JSON, same "undocumented but genuinely public" category as
@@ -45,7 +45,11 @@ function appendHistory(dataDir, file, row) {
 async function scrapeReservoirs(dataDir, scrapedAt) {
   const res = await fetch(RESERVOIR_URL);
   if (!res.ok) throw new Error(`${RESERVOIR_URL} -> HTTP ${res.status}`);
-  const records = parseReservoirRecord(await res.text());
+  const html = await res.text();
+  const records = parseReservoirRecord(html);
+  // What the figures are as-of (EGAT publishes a daily report), distinct from scrapedAt.
+  const reportedAt = parseReservoirReportDate(html);
+  if (!reportedAt) console.error("Could not read the EGAT report date — storing reportedAt: null (UI will not show it as fresh).");
 
   for (const { name, file } of RESERVOIRS) {
     const record = records.find((r) => r.name === name);
@@ -55,6 +59,7 @@ async function scrapeReservoirs(dataDir, scrapedAt) {
     }
     appendHistory(dataDir, file, {
       scrapedAt,
+      reportedAt,
       storagePercent: record.storagePercent,
       levelMsl: record.levelMsl,
       releaseRateM3s: record.releaseRateM3s,

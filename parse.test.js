@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -115,6 +115,23 @@ test("parseReservoirRecord extracts Srinakarin and converts its MCM/day release 
 test("parseReservoirRecord returns only the two tracked dams, ignoring every other row", () => {
   const names = parseReservoirRecord(EGAT_HTML).map((r) => r.name).sort();
   assert.deepEqual(names, ["วชิราลงกรณ", "ศรีนครินทร์"].sort());
+});
+
+test("parseReservoirReportDate reads the page's own report time (Buddhist year, 24.00 = end of day)", () => {
+  // Header: "28 กันยายน 2569 เวลา 24.00 น." == end of 28 Sep 2026 == 00:00 on 29 Sep, Bangkok time.
+  assert.equal(parseReservoirReportDate(EGAT_HTML), "2026-09-29T00:00:00+07:00");
+});
+
+test("parseReservoirReportDate handles an ordinary clock time", () => {
+  assert.equal(
+    parseReservoirReportDate("<h2>3 ตุลาคม 2569 เวลา 08.30 น.</h2>"),
+    "2026-10-03T08:30:00+07:00",
+  );
+});
+
+test("parseReservoirReportDate returns null when the page has no recognisable report time — never guesses", () => {
+  assert.equal(parseReservoirReportDate("<h2>สถานการณ์น้ำ</h2>"), null);
+  assert.equal(parseReservoirReportDate("<h2>3 เดือนลับ 2569 เวลา 08.30 น.</h2>"), null);
 });
 
 test("parseReservoirRecord omits a dam whose row is absent, and yields nulls for non-numeric cells", () => {

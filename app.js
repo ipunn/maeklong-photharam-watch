@@ -18,12 +18,31 @@
     return (Date.now() - ms) / 60000;
   }
 
+  function formatDuration(mins) {
+    if (mins < 60) return `${Math.round(mins)} นาที`;
+    const hours = mins / 60;
+    if (hours < 24) return `${hours.toFixed(1)} ชั่วโมง`;
+    return `${(hours / 24).toFixed(1)} วัน`;
+  }
+
   function formatAge(mins) {
     if (!Number.isFinite(mins)) return "ไม่ทราบเวลาที่อัปเดต";
-    if (mins < 60) return `อัปเดตเมื่อ ${Math.round(mins)} นาทีที่แล้ว`;
-    const hours = mins / 60;
-    if (hours < 24) return `อัปเดตเมื่อ ${hours.toFixed(1)} ชั่วโมงที่แล้ว`;
-    return `อัปเดตเมื่อ ${(hours / 24).toFixed(1)} วันที่แล้ว`;
+    return `อัปเดตเมื่อ ${formatDuration(mins)}ที่แล้ว`;
+  }
+
+  // EGAT publishes a daily report; its figures are "as of" the report time, not
+  // the time we scraped it. A 00:00 report time means "end of the previous day".
+  function formatReportTime(iso) {
+    const ms = new Date(iso).getTime();
+    if (Number.isNaN(ms)) return null;
+    const fmt = (opts) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", ...opts });
+    const dateOpts = { day: "numeric", month: "short", year: "numeric" };
+    const parts = fmt({ hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(ms);
+    const hour = Number(parts.find((p) => p.type === "hour").value);
+    const minute = Number(parts.find((p) => p.type === "minute").value);
+    if (hour === 0 && minute === 0) return `สิ้นวันที่ ${fmt(dateOpts).format(ms - 60000)}`;
+    const clock = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    return `${fmt(dateOpts).format(ms)} ${clock} น.`;
   }
 
   const STATUS_LABEL = {
@@ -33,10 +52,11 @@
   };
 
   // Upstream context, not a river reading: rendered in its own section.
-  // Rows carry no source timestamp, so freshness is judged from scrapedAt.
+  // EGAT's daily report: freshness is judged from the report's own as-of time
+  // (reportedAt), with a day and a half of slack before flagging it.
   const RESERVOIRS = [
-    { file: "data/reservoir-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: 45 },
-    { file: "data/reservoir-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: 45 },
+    { file: "data/reservoir-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: 36 * 60 },
+    { file: "data/reservoir-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: 36 * 60 },
   ];
 
   function renderChart(history, key = "levelMsl") {
@@ -114,9 +134,15 @@
       return card;
     }
 
-    const mins = ageMinutes(latest.scrapedAt);
-    const stale = mins > staleMinutes;
+    // Freshness is the report's own as-of time, never scrapedAt: the page is a
+    // daily report, so "scraped 2 minutes ago" says nothing about the figures' age.
+    const mins = ageMinutes(latest.reportedAt);
+    const asOf = latest.reportedAt ? formatReportTime(latest.reportedAt) : null;
+    const stale = !asOf || mins > staleMinutes;
     const fmt = (v, digits) => (typeof v === "number" ? v.toFixed(digits) : "–");
+    const metaText = asOf
+      ? `ข้อมูลรายวันของ กฟผ. ณ ${asOf} (ผ่านมา ${formatDuration(mins)})${stale ? " — ข้อมูลเก่ากว่า 1 วัน อาจไม่ล่าสุด" : ""}`
+      : "ไม่ทราบวันที่ของข้อมูล — อย่าใช้เป็นข้อมูลล่าสุด";
 
     card.innerHTML = `
       <div class="station-header"><span class="station-name">${name}</span></div>
@@ -125,7 +151,7 @@
         <div><span class="stat-label">ระดับน้ำ</span> ${fmt(latest.levelMsl, 2)} <span class="unit">ม.รทก.</span></div>
         <div><span class="stat-label">อัตราระบาย</span> ${fmt(latest.releaseRateM3s, 2)} <span class="unit">ลบ.ม./วินาที</span></div>
       </div>
-      <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? " — ข้อมูลอาจไม่ล่าสุด" : ""}</div>
+      <div class="station-meta" data-stale="${stale}">${metaText}</div>
       ${renderChart(history, "storagePercent")}
     `;
     return card;

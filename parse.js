@@ -79,6 +79,30 @@ function parseReservoirRecord(raw) {
   return records;
 }
 
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
+// The EGAT page is a daily report, headed e.g. "28 กันยายน 2569 เวลา 24.00 น."
+// (Buddhist year; 24.00 == end of that day). That is the time the figures
+// are AS OF — not when we scraped — so the UI must age them from here.
+// Returns null when the header isn't recognisable: never guess a date.
+function parseReservoirReportDate(raw) {
+  const m = String(raw).match(/(\d{1,2})\s+(\S+)\s+(\d{4})\s+เวลา\s+(\d{1,2})[.:](\d{2})/);
+  if (!m) return null;
+  const month = THAI_MONTHS.indexOf(m[2]);
+  if (month < 0) return null;
+  const year = Number(m[3]) - 543;
+  // Date.UTC rolls hour 24 over to 00:00 of the next day for us.
+  const bangkokAsUtc = new Date(Date.UTC(year, month, Number(m[1]), Number(m[4]), Number(m[5])));
+  const p = (n) => String(n).padStart(2, "0");
+  return (
+    `${bangkokAsUtc.getUTCFullYear()}-${p(bangkokAsUtc.getUTCMonth() + 1)}-${p(bangkokAsUtc.getUTCDate())}` +
+    `T${p(bangkokAsUtc.getUTCHours())}:${p(bangkokAsUtc.getUTCMinutes())}:00+07:00`
+  );
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord };
+  module.exports = { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate };
 }
