@@ -507,6 +507,8 @@ h1 {
 @media (min-width: 620px) {
   .flow-body {
     grid-template-columns: 1fr 230px;
+    /* A wide column gap keeps the text column (bank bar, its labels) clear of the chart's ticks. */
+    gap: 8px 40px;
     align-items: start;
   }
 }
