@@ -215,16 +215,26 @@
   const GAUGE_STEADY_M = 0.02; // <= 2 cm over the span reads as "steady"
   const RELEASE_STEADY_M3S = 10;
 
-  const FLOW = [
-    { kind: "dam", branch: "แควใหญ่", name: "เขื่อนศรีนครินทร์", res: RESERVOIRS[1] },
-    { kind: "dam", branch: "แควน้อย", name: "เขื่อนวชิราลงกรณ", res: RESERVOIRS[0] },
-    { kind: "gauge", branch: "แควน้อย", station: STATIONS[0] },
-    { kind: "note", text: "แควใหญ่ (ศรีนครินทร์) และแควน้อย (วชิราลงกรณ) เป็นคนละสาย ไหลมารวมกันที่ จ.กาญจนบุรี กลายเป็นแม่น้ำแม่กลอง" },
-    { kind: "gauge", branch: "แม่กลอง", station: STATIONS[1] },
-    { kind: "gauge", branch: "แม่กลอง", station: STATIONS[2] },
-    { kind: "you", name: "พื้นที่ของคุณ", text: "อำเภอโพธาราม จังหวัดราชบุรี" },
-    { kind: "gauge", branch: "แม่กลอง", station: STATIONS[3] },
+  // The two upstream rivers are PARALLEL, not in sequence: they merge at Kanchanaburi
+  // into the Mae Klong, so they are drawn as separate branches, then one main line.
+  const BRANCHES = [
+    { title: "สายแควใหญ่", nodes: [{ kind: "dam", name: "เขื่อนศรีนครินทร์", res: RESERVOIRS[1] }] },
+    {
+      title: "สายแควน้อย",
+      nodes: [
+        { kind: "dam", name: "เขื่อนวชิราลงกรณ", res: RESERVOIRS[0] },
+        { kind: "gauge", station: STATIONS[0] },
+      ],
+    },
   ];
+  const MERGE_TEXT = "แควใหญ่และแควน้อยไหลมารวมกันที่ จ.กาญจนบุรี กลายเป็นแม่น้ำแม่กลอง";
+  const MAIN = [
+    { kind: "gauge", station: STATIONS[1] },
+    { kind: "gauge", station: STATIONS[2] },
+    { kind: "you", name: "พื้นที่ของคุณ", text: "อำเภอโพธาราม จังหวัดราชบุรี" },
+    { kind: "gauge", station: STATIONS[3] },
+  ];
+  const FLOW = [...BRANCHES.flatMap((b) => b.nodes), ...MAIN];
 
   const TYPE_LABEL = { dam: "🏞️ เขื่อน", gauge: "📏 จุดวัดระดับน้ำในแม่น้ำ" };
   const TREND_TEXT = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] };
@@ -250,15 +260,12 @@
   }
 
   function flowNodeHtml(node, d) {
-    if (node.kind === "note") return `<li class="flow-note">⤵ ${node.text}</li>`;
     if (node.kind === "you") {
       return `<li class="flow-node flow-you"><div class="flow-type">📍 พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
     }
     const type = `<div class="flow-type" data-type="${node.kind}">${TYPE_LABEL[node.kind]}</div>`;
     const st = node.station;
-    const title = node.kind === "dam"
-      ? `<span class="flow-branch">${node.branch}</span> ${node.name}`
-      : `<span class="flow-branch">${node.branch}</span> ${st.name} <span class="flow-role">${st.role}</span>`;
+    const title = node.kind === "dam" ? node.name : `${st.name} <span class="flow-role">${st.role}</span>`;
     if (!d) {
       return `<li class="flow-node">${type}<div class="flow-name">${title}</div><div class="flow-meta">ไม่มีข้อมูล</div></li>`;
     }
@@ -311,13 +318,19 @@
 
   async function renderFlow() {
     const root = document.getElementById("flow");
-    const datas = await Promise.all(FLOW.map((n) => (n.kind === "you" || n.kind === "note" ? null : nodeData(n).catch(() => null))));
-    const gaugeTrends = FLOW.map((n, i) => (n.kind === "gauge" && datas[i] ? datas[i].trend : undefined)).filter((t) => t !== undefined);
+    const datas = new Map();
+    await Promise.all(
+      FLOW.filter((n) => n.kind !== "you").map(async (n) => datas.set(n, await nodeData(n).catch(() => null))),
+    );
+    const list = (nodes) => `<ol class="flow">${nodes.map((n) => flowNodeHtml(n, datas.get(n))).join("")}</ol>`;
+    const gaugeTrends = FLOW.filter((n) => n.kind === "gauge" && datas.get(n)).map((n) => datas.get(n).trend);
     const count = (dir) => gaugeTrends.filter((t) => t && t.direction === dir).length;
     const unknown = gaugeTrends.filter((t) => !t).length;
     const summary = `จุดวัดระดับน้ำ ${gaugeTrends.length} แห่ง: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}`;
     root.innerHTML = `<div class="flow-summary">${summary}</div>
-      <ol class="flow">${FLOW.map((n, i) => flowNodeHtml(n, datas[i])).join("")}</ol>`;
+      <div class="branches">${BRANCHES.map((b) => `<div class="branch"><div class="branch-title">${b.title}</div>${list(b.nodes)}</div>`).join("")}</div>
+      <div class="merge">⬇ ${MERGE_TEXT}</div>
+      <div class="branch-title main-title">แม่น้ำแม่กลอง</div>${list(MAIN)}`;
   }
 
   async function renderInto(rootId, items, load, nameHtml) {
