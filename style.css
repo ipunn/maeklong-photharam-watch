@@ -847,3 +847,53 @@ h1 {
   margin: 0 0 0.75rem;
   font-size: 0.9rem;
 }
+
+/* Bang Kruai page: compact gauge cards in a grid, closest to the area first. */
+.bk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.bk-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-width: 0;
+  --line: var(--accent);
+}
+.bk-kind {
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+.bk-name {
+  font-weight: 700;
+  line-height: 1.3;
+}
+.bk-where {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.bk-card .station-level {
+  font-size: 1.8rem;
+  margin-top: 4px;
+}
+.bk-line {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+.bk-line[data-stale="true"] {
+  color: var(--stale-text);
+}
+.bk-line b {
+  color: var(--text);
+  font-weight: 600;
+}
+.bk-card .spark {
+  margin-top: 8px;
+}
+.bk-card .spark svg {
+  height: 44px;
+}
