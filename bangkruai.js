@@ -133,6 +133,17 @@
     return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} ${word} ราว 3 ชม.</span></div>`;
   }
 
+  // Non-tidal gauge only (C.13): net change against ~24 h ago. Not used for tidal gauges, where
+  // the tide is at a different phase at the same clock time each day; they show the day-on-day
+  // change of the daily high and low instead.
+  function longTrendHtml(recent) {
+    const t = trendOf(recent.map((p) => ({ t: p.t, v: p.v })), "v", "t", 24, 0.05);
+    if (!t) return `<div class="flow-meta"><span class="trend" data-dir="none">ยังไม่มีข้อมูลย้อนหลัง 24 ชม. พอเทียบ</span></div>`;
+    const [arrow, word] = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] }[t.direction];
+    const text = t.direction === "steady" ? word : `${word} ${Math.round(Math.abs(t.delta) * 100)} ซม.`;
+    return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} เทียบ 24 ชม.ก่อน: ${text}</span></div>`;
+  }
+
   // One node in the same markup as the Mae Klong river line / watched-area card.
   function nodeHtml(station, d, roleOverride) {
     const axisEndT = state.axisEndT;
@@ -155,7 +166,7 @@
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
       ${bankHtml(latest.levelMsl, latest.bankMsl)}
       ${discharge}
-      ${station.tidal ? dailyHtml(d.summary.days) : trendHtml(d.summary.recent)}
+      ${station.tidal ? dailyHtml(d.summary.days) : trendHtml(d.summary.recent) + longTrendHtml(d.summary.recent)}
       <div class="flow-meta" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div></div>
       <div class="flow-sparks">${chartHtml(d.summary.recent, axisEndT)}</div></div></li>`;
   }
