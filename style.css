@@ -850,3 +850,8 @@ h1 {
   color: var(--text-dim);
   margin-top: 0;
 }
+
+/* the panel is filled by script; never show an empty bordered card while loading or on failure */
+.here:empty {
+  display: none;
+}
