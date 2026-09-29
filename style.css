@@ -987,3 +987,25 @@ h1 {
   line-height: 1.4;
   margin: -6px 0 10px;
 }
+
+/* Card rhythm: metric groups are spaced apart; explanations sit apart in small grey "remark" text. */
+.flow-group {
+  margin-top: 10px;
+}
+.flow-group .flow-meta:first-child {
+  margin-top: 0;
+}
+.flow-remark {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.bank-scale {
+  margin-bottom: 4px;
+}
+.flow-sparks {
+  margin-top: 6px;
+}

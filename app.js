@@ -270,7 +270,7 @@
   const LONG_WINDOW_H = 24;
   const LONG_STEADY_M = 0.05; // <= 5 cm over a day reads as "steady"
   function longTrendHtml(t) {
-    if (!t) return `<div class="flow-meta"><span class="trend" data-dir="none">ยังไม่มีข้อมูลย้อนหลัง ${LONG_WINDOW_H} ชม. พอเทียบ</span></div>`;
+    if (!t) return ""; // the caller adds a remark: "no data yet" is not a measurement
     const [arrow, word] = TREND_TEXT[t.direction];
     const cm = Math.round(Math.abs(t.delta) * 100);
     const text = t.direction === "steady" ? `${word}` : `${word} ${cm} ซม.`;
@@ -401,12 +401,20 @@
       return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
         <div class="flow-body"><div class="flow-text">${cap}
         <div class="flow-value"><span class="flow-label">ระบายน้ำลงแม่น้ำ</span> ${release}</div>
-        <div class="flow-meta">${trendHtml(d.trend, "dam")}</div>${freshnessHtml(d)}</div></div></li>`;
+        ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "dam")}</div></div>` : ""}
+        <div class="flow-group">${freshnessHtml(d)}</div>
+        ${d.trend ? "" : `<div class="flow-remark">ยังไม่มีข้อมูลพอเทียบแนวโน้ม</div>`}</div></div></li>`;
     }
+    // "No data yet" messages are remarks in small grey text, apart from the measurements.
+    const remarks = [];
+    if (!d.trend) remarks.push("ยังไม่มีข้อมูลพอเทียบแนวโน้ม");
+    if (!d.longTrend) remarks.push(`ยังไม่มีข้อมูลย้อนหลัง ${LONG_WINDOW_H} ชม. พอเทียบ`);
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
-      <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${longTrendHtml(d.longTrend)}${freshnessHtml(d)}</div>
+      ${d.trend || d.longTrend ? `<div class="flow-group">${d.trend ? `<div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>` : ""}${longTrendHtml(d.longTrend)}</div>` : ""}
+      <div class="flow-group">${freshnessHtml(d)}</div>
+      ${remarks.length ? `<div class="flow-remark">${remarks.join("<br>")}</div>` : ""}</div>
       <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, CHART_WINDOW_H, true, true)}</div></div></li>`;
   }
 

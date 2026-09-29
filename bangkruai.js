@@ -94,7 +94,7 @@
   const cm = (m) => `${m > 0 ? "+" : m < 0 ? "−" : "±"}${Math.abs(Math.round(m * 100))} ซม.`;
   function dailyHtml(days) {
     const shown = days.slice(-2).reverse();
-    if (!shown.length) return `<div class="flow-meta">รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน</div>`;
+    if (!shown.length) return "";
     // The tide swings the level twice a day, so also show what it cannot explain: the tidal
     // range of the last full day and whether that day's high and low moved against the day before.
     const t = tideTrend(days);
@@ -149,7 +149,7 @@
   // change of the daily high and low instead.
   function longTrendHtml(recent) {
     const t = trendOf(recent.map((p) => ({ t: p.t, v: p.v })), "v", "t", 24, 0.05);
-    if (!t) return `<div class="flow-meta"><span class="trend" data-dir="none">ยังไม่มีข้อมูลย้อนหลัง 24 ชม. พอเทียบ</span></div>`;
+    if (!t) return "";
     const [arrow, word] = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] }[t.direction];
     const text = t.direction === "steady" ? word : `${word} ${Math.round(Math.abs(t.delta) * 100)} ซม.`;
     return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} เทียบ 24 ชม.ก่อน: ${text}</span></div>`;
@@ -167,18 +167,32 @@
     }
     const mins = ageMinutes(latest.updatedAt);
     const stale = !(mins <= STALE_MINUTES);
+    // Metrics first, then freshness, then small "remark" text (explanations and "no data yet"
+    // messages) kept apart so they never read as measurements.
+    const remarks = [];
     const discharge =
       label.discharge && typeof latest.dischargeM3s === "number"
-        ? `<div class="flow-value"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ${latest.dischargeM3s.toLocaleString("en")} <span class="unit">ลบ.ม./วินาที</span></div>
-           <div class="flow-meta">วัดท้ายเขื่อนทดน้ำ เป็นอัตราการไหลของแม่น้ำ ไม่ใช่อัตราระบายของเขื่อน</div>`
+        ? `<div class="flow-value"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ${latest.dischargeM3s.toLocaleString("en")} <span class="unit">ลบ.ม./วินาที</span></div>`
         : "";
+    if (discharge) remarks.push("วัดท้ายเขื่อนทดน้ำ เป็นอัตราการไหลของแม่น้ำ ไม่ใช่อัตราระบายของเขื่อน");
+    let movement;
+    if (station.tidal) {
+      movement = dailyHtml(d.summary.days);
+      if (!movement) remarks.push("รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน");
+    } else {
+      const long = longTrendHtml(d.summary.recent);
+      movement = trendHtml(d.summary.recent) + long;
+      if (!long) remarks.push("ยังไม่มีข้อมูลย้อนหลัง 24 ชม. พอเทียบ");
+    }
+    const group = (html) => (html ? `<div class="flow-group">${html}</div>` : "");
     return `<li class="flow-node${stale ? " flow-stale" : ""}${alerts(station.id, latest.levelMsl, latest.bankMsl) ? " flow-alert" : ""}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
-      ${bankHtml(station.id, latest.levelMsl, latest.bankMsl)}
-      ${discharge}
-      ${station.tidal ? dailyHtml(d.summary.days) : trendHtml(d.summary.recent) + longTrendHtml(d.summary.recent)}
-      <div class="flow-meta" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div></div>
+      ${group(bankHtml(station.id, latest.levelMsl, latest.bankMsl))}
+      ${group(discharge)}
+      ${group(movement)}
+      ${group(`<div class="flow-meta" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div>`)}
+      ${remarks.length ? `<div class="flow-remark">${remarks.join("<br>")}</div>` : ""}</div>
       <div class="flow-sparks">${chartHtml(d.summary.recent, axisEndT)}</div></div></li>`;
   }
 
