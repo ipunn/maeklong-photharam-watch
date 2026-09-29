@@ -163,6 +163,24 @@ function reservoirBand(percent) {
   return { key: "critical-low", label: "น้ำน้อยวิกฤต" };
 }
 
+// Is the automatic collector alive? Uses the newest `scrapedAt` (when WE last ran)
+// across all data files, which is separate from how old the SOURCE data is.
+// "unknown" when no usable timestamp exists — never claims the collector is fine.
+function collectorHealth(scrapedAts, nowMs, warnMinutes) {
+  let latestMs = -Infinity;
+  let latest = null;
+  for (const iso of scrapedAts) {
+    const ms = new Date(iso).getTime();
+    if (!Number.isNaN(ms) && ms > latestMs) {
+      latestMs = ms;
+      latest = iso;
+    }
+  }
+  if (latest === null) return { status: "unknown", latest: null, ageMinutes: null };
+  const ageMinutes = (nowMs - latestMs) / 60000;
+  return { status: ageMinutes > warnMinutes ? "stale" : "ok", latest, ageMinutes };
+}
+
 // One point per SOURCE timestamp, oldest first (repeated scrapes of one unchanged
 // reading collapse to a single point).
 // How a series moved, using only the readings we have. `timeKey` is the SOURCE's
@@ -198,5 +216,5 @@ function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

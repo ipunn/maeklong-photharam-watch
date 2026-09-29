@@ -664,3 +664,15 @@ h1 {
     visibility: hidden;
   }
 }
+
+/* collector health: one plain line; font colour only when it is not healthy */
+.health {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+
+.health-warn {
+  color: #b91c1c;
+  font-weight: 700;
+}

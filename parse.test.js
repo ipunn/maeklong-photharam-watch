@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -284,4 +284,26 @@ test("trendOf reports the latest step separately, so a late dip is not hidden by
 test("trendOf lastDelta follows the newest two distinct readings", () => {
   const t = trendOf([row("10:00", 1), row("11:00", 2), row("12:00", 4)], "levelMsl", "updatedAt", 3, 0.02);
   assert.equal(t.lastDelta, 2);
+});
+
+// collectorHealth: is the automatic collector alive? Judged from the newest scrapedAt
+// across every data file (when WE last ran), separate from how old the source data is.
+const T = (iso) => new Date(iso).getTime();
+
+test("collectorHealth uses the newest scrapedAt and reports its age", () => {
+  const h = collectorHealth(["2026-09-29T07:00:00Z", "2026-09-29T07:10:00Z", "2026-09-29T06:00:00Z"], T("2026-09-29T07:25:00Z"), 45);
+  assert.equal(h.status, "ok");
+  assert.equal(h.ageMinutes, 15);
+  assert.equal(h.latest, "2026-09-29T07:10:00Z");
+});
+
+test("collectorHealth flags a collector that has not run within the threshold", () => {
+  const h = collectorHealth(["2026-09-29T07:00:00Z"], T("2026-09-29T07:46:00Z"), 45);
+  assert.equal(h.status, "stale");
+  assert.equal(collectorHealth(["2026-09-29T07:00:00Z"], T("2026-09-29T07:45:00Z"), 45).status, "ok"); // exactly at the limit
+});
+
+test("collectorHealth is 'unknown' with no usable timestamp — never claims the collector is fine", () => {
+  assert.equal(collectorHealth([], Date.now(), 45).status, "unknown");
+  assert.equal(collectorHealth([null, undefined, "garbage"], Date.now(), 45).status, "unknown");
 });

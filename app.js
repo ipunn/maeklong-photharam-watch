@@ -406,6 +406,39 @@
       <ol class="flow flow-main"><li class="flow-merge">${MERGE_TEXT}</li>${items(MAIN)}</ol>`;
   }
 
+  // ---- Collector health: is the automatic collection itself running? ----
+  // Judged from the newest scrapedAt across ALL data files (when we last ran), which is
+  // separate from each card's data age (how old the SOURCE's reading is).
+  const COLLECTOR_WARN_MINUTES = 45; // the schedule is every 15 min; allow for GitHub delays
+  let collectorTimes = [];
+
+  function renderHealth() {
+    const el = document.getElementById("health");
+    if (!el) return;
+    const h = collectorHealth(collectorTimes, Date.now(), COLLECTOR_WARN_MINUTES);
+    if (h.status === "unknown") {
+      el.innerHTML = `<span class="health-warn">ไม่ทราบเวลาที่ตัวดึงข้อมูลอัตโนมัติทำงานล่าสุด — ข้อมูลอาจไม่อัพเดทล่าสุด</span>`;
+      return;
+    }
+    const when = formatReportTime(h.latest);
+    if (h.status === "stale") {
+      el.innerHTML = `<span class="health-warn">ตัวดึงข้อมูลอัตโนมัติไม่ทำงานมาแล้ว ${formatDuration(h.ageMinutes)} (ล่าสุด ${when}) — ข้อมูลด้านล่างอาจไม่อัพเดทล่าสุด</span>`;
+      return;
+    }
+    el.innerHTML = `ตัวดึงข้อมูลอัตโนมัติ: ทำงานล่าสุดเมื่อ ${formatDuration(h.ageMinutes)}ที่แล้ว (${when})`;
+  }
+
+  async function loadHealth() {
+    const files = [
+      ...STATIONS.map((st) => st.file),
+      ...RESERVOIRS.flatMap((r) => [r.file, r.hourlyFile]),
+    ];
+    const histories = await Promise.all(files.map((f) => getHistory(f).catch(() => [])));
+    collectorTimes = histories.map((rows) => (rows.length ? rows[rows.length - 1].scrapedAt : null));
+    renderHealth();
+    setInterval(renderHealth, 60000); // keep the age current if the page stays open
+  }
+
   async function renderInto(rootId, items, load, nameHtml) {
     const root = document.getElementById(rootId);
     for (const item of items) {
@@ -422,6 +455,7 @@
   }
 
   function main() {
+    loadHealth();
     renderFlow().catch((err) => {
       document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ: ${err.message}</div>`;
     });
