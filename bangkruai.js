@@ -1,23 +1,39 @@
-// Renders the Bang Kruai Site: proxy gauges side by side, no headline, no status colour.
-// Reads only each gauge's small summary file (daily high/low + recent readings), never the
-// full 10-minute history. Static and client-side; the GitHub Action does the scraping.
+// Renders the Bang Kruai Site in the same shape as the Mae Klong page: the watched area
+// on top (the one gauge nearest to it), then the river line in flow order. Proxy gauges only,
+// no headline gauge, no status colour. Reads only each gauge's small summary file
+// (latest reading + daily high/low + recent readings), never the full 10-minute history.
+// Static and client-side; the GitHub Action does the scraping.
 (function () {
   const STALE_MINUTES = 6 * 60;
   const STALE_TEXT = "ข้อมูลอาจไม่อัพเดทล่าสุด";
   const COLLECTOR_WARN_MINUTES = 60;
 
   // Labels state the waterway and relation to the area; the feed geocodes BKK003 to
-  // Taling Chan, so nothing here implies a gauge is in the area. Order: closest to the area
-  // first, then by potential impact; distances are rough straight-line estimates from the
-  // middle of บางกรวย–บางคูเวียง.
+  // Taling Chan, so nothing here implies a gauge is in the area. Distances are rough
+  // straight-line estimates from the middle of บางกรวย–บางคูเวียง.
   const LABELS = {
-    5: { kind: "คลอง · ใกล้พื้นที่ที่สุด", name: "คลองมหาสวัสดิ์ บางกรวย-สวนผัก", code: "BKK003", where: "จุดวัดอยู่เขตตลิ่งชัน กรุงเทพฯ · ห่างประมาณ 4 กม." },
-    2599: { kind: "แม่น้ำเจ้าพระยา", name: "สามเสน", code: "C.12", where: "เขตดุสิต กรุงเทพฯ · ห่างประมาณ 5 กม." },
-    4: { kind: "แม่น้ำเจ้าพระยา", name: "สะพานกรุงเทพ", code: "CPY015", where: "เขตธนบุรี กรุงเทพฯ · ห่างประมาณ 12 กม." },
-    26: { kind: "แม่น้ำเจ้าพระยา", name: "สะพานนวลฉวี ปากเกร็ด", code: "CPY014", where: "อ.ปากเกร็ด นนทบุรี · ห่างประมาณ 15 กม." },
-    2744: { kind: "ต้นน้ำ · อัตราการไหล", name: "ท้ายเขื่อนเจ้าพระยา", code: "C.13", where: "อ.สรรพยา จ.ชัยนาท · ต้นน้ำห่างมาก", discharge: true },
+    5: { name: "คลองมหาสวัสดิ์ บางกรวย-สวนผัก", code: "BKK003", role: "จุดวัดที่ใกล้พื้นที่ที่สุด · ห่างประมาณ 4 กม.", type: "จุดวัดระดับน้ำในคลอง (ขึ้น–ลงตามน้ำทะเล)" },
+    2744: { name: "ท้ายเขื่อนเจ้าพระยา", code: "C.13", role: "อ.สรรพยา จ.ชัยนาท · ต้นน้ำห่างมาก", type: "จุดวัดในแม่น้ำเจ้าพระยา", discharge: true },
+    26: { name: "สะพานนวลฉวี ปากเกร็ด", code: "CPY014", role: "อ.ปากเกร็ด นนทบุรี · ห่างประมาณ 15 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
+    2599: { name: "สามเสน", code: "C.12", role: "เขตดุสิต กรุงเทพฯ · ห่างประมาณ 5 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
+    4: { name: "สะพานกรุงเทพ", code: "CPY015", role: "เขตธนบุรี กรุงเทพฯ · ห่างประมาณ 12 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
   };
-  const ORDER = [5, 2599, 4, 26, 2744];
+
+  // Chao Phraya main line, upstream -> downstream. Order follows the river's course south
+  // from the Chao Phraya Dam (C.13, Chai Nat) to the sea: Pak Kret, Samsen, Bangkok Bridge.
+  // The area's own canals join the river through Khlong Bangkok Noi, which leaves the river
+  // between Samsen and Bangkok Bridge (see the research note in .scratch/).
+  const LINE = [
+    { id: 2744 },
+    { id: 26 },
+    { id: 2599 },
+    {
+      you: true,
+      text: "พื้นที่ของคุณ อยู่ริมคลองบางค้อ (ไม่มีจุดวัด) ต่อกับเจ้าพระยาผ่านคลองอ้อมนนท์ → คลองบางกอกน้อย ระหว่างสามเสนกับสะพานกรุงเทพ · จุดวัดใกล้สุดคือคลองมหาสวัสดิ์ (BKK003) ด้านบน (ตำแหน่งเส้นทางน้ำเป็นการอนุมานจากแผนที่)",
+    },
+    { id: 4 },
+  ];
+  const HERE_ID = 5;
 
   const ageMinutes = (iso) => {
     const ms = new Date(iso).getTime();
@@ -50,10 +66,10 @@
   // Tidal gauges: the latest two Bangkok days' high and low, one line each.
   function dailyHtml(days) {
     const shown = days.slice(-2).reverse();
-    if (!shown.length) return `<div class="bk-line">รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน</div>`;
+    if (!shown.length) return `<div class="flow-meta">รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน</div>`;
     return shown
       .map(
-        (d) => `<div class="bk-line">${dayLabel(d.date)}${d.partial ? " (ยังไม่ครบวัน)" : ""}: สูงสุด <b>${d.high.toFixed(2)}</b> ${clock(d.highAt)} · ต่ำสุด <b>${d.low.toFixed(2)}</b> ${clock(d.lowAt)}</div>`,
+        (d) => `<div class="flow-meta">${dayLabel(d.date)}${d.partial ? " (ยังไม่ครบวัน)" : ""}: สูงสุด <b>${d.high.toFixed(2)}</b> ${clock(d.highAt)} · ต่ำสุด <b>${d.low.toFixed(2)}</b> ${clock(d.lowAt)}</div>`,
       )
       .join("");
   }
@@ -68,46 +84,77 @@
     const xy = pts.map((p) => [pad + ((p.t - t0) / (tN - t0)) * (w - pad * 2), h - pad - ((p.v - min) / (max - min)) * (h - pad * 2)]);
     const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
     const [ex, ey] = xy[xy.length - 1];
-    const spanH = (tN - t0) / 3600000;
     return `<div class="spark">
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="ระดับผิวน้ำ"><polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" /></svg>
-      <div class="bk-line">${spanH.toFixed(0)} ชม.ที่ผ่านมา: ${pts[0].v.toFixed(2)} → ${pts[pts.length - 1].v.toFixed(2)} ม.</div></div>`;
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="ระดับผิวน้ำ ${((tN - t0) / 3600000).toFixed(0)} ชั่วโมงที่ผ่านมา"><polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" /></svg>
+      <div class="spark-cap">${((tN - t0) / 3600000).toFixed(0)} ชม.ที่ผ่านมา: ${pts[0].v.toFixed(2)} → ${pts[pts.length - 1].v.toFixed(2)} ม.</div></div>`;
   }
 
   function trendHtml(recent) {
     const t = trendOf(recent.map((p) => ({ t: p.t, v: p.v })), "v", "t", 3, 0.02);
     if (!t) return "";
     const [arrow, word] = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] }[t.direction];
-    return `<div class="bk-line"><span class="trend" data-dir="${t.direction}">${arrow} ${word} ราว 3 ชม.</span></div>`;
+    return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} ${word} ราว 3 ชม.</span></div>`;
   }
 
-  async function loadGauge(station) {
+  // One node in the same markup as the Mae Klong river line / watched-area card.
+  function nodeHtml(station, d, roleOverride) {
     const label = LABELS[station.id];
-    const card = document.createElement("div");
-    card.className = "bk-card";
-    const head = `<div class="bk-kind">${label.kind}</div>
-      <div class="bk-name">${label.name} <span class="bk-where">${label.code}</span></div>
-      <div class="bk-where">${label.where}</div>`;
-    const summary = await getJson("data/" + station.summary).catch(() => ({ latest: null, days: [], recent: [] }));
-    const latest = summary.latest;
+    const type = `<div class="flow-type" data-type="gauge">${label.type}</div>`;
+    const title = `${label.name} <span class="flow-role">${label.code} · ${roleOverride || label.role}</span>`;
+    const latest = d && d.summary.latest;
     if (!latest || typeof latest.levelMsl !== "number") {
-      card.innerHTML = `${head}<div class="chart-empty">${latest ? "ไม่มีข้อมูลระดับน้ำจากแหล่งข้อมูลในรอบล่าสุด" : "ยังไม่มีข้อมูล"}</div>`;
-      return card;
+      return `<li class="flow-node">${type}<div class="flow-name">${title}</div><div class="flow-meta">${latest ? "ไม่มีข้อมูลระดับน้ำในรอบล่าสุด" : "ไม่มีข้อมูล"}</div></li>`;
     }
     const mins = ageMinutes(latest.updatedAt);
     const stale = !(mins <= STALE_MINUTES);
     const discharge =
       label.discharge && typeof latest.dischargeM3s === "number"
-        ? `<div class="bk-line"><b>อัตราการไหล ${latest.dischargeM3s.toLocaleString("en")} ลบ.ม./วินาที</b> (ของแม่น้ำท้ายเขื่อนทดน้ำ ไม่ใช่อัตราระบายเขื่อน)</div>`
+        ? `<div class="flow-value"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ${latest.dischargeM3s.toLocaleString("en")} <span class="unit">ลบ.ม./วินาที</span></div>
+           <div class="flow-meta">วัดท้ายเขื่อนทดน้ำ เป็นอัตราการไหลของแม่น้ำ ไม่ใช่อัตราระบายของเขื่อน</div>`
         : "";
-    card.innerHTML = `${head}
-      <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
-      <div class="bk-line">${bankText(latest.levelMsl, latest.bankMsl)}</div>
+    return `<li class="flow-node${stale ? " flow-stale" : ""}">${type}<div class="flow-name">${title}</div>
+      <div class="flow-body"><div class="flow-text">
+      <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
+      <div class="flow-meta">${bankText(latest.levelMsl, latest.bankMsl)}</div>
       ${discharge}
-      ${station.tidal ? dailyHtml(summary.days) : trendHtml(summary.recent)}
-      <div class="bk-line" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` — ${STALE_TEXT}` : ""}</div>
-      ${chartHtml(summary.recent)}`;
-    return card;
+      ${station.tidal ? dailyHtml(d.summary.days) : trendHtml(d.summary.recent)}
+      <div class="flow-meta" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div></div>
+      <div class="flow-sparks">${chartHtml(d.summary.recent)}</div></div></li>`;
+  }
+
+  async function render() {
+    const stations = new Map(stationsForSite("bangkruai").map((s) => [s.id, s]));
+    const data = new Map();
+    await Promise.all(
+      [...stations.values()].map(async (s) =>
+        data.set(s.id, { summary: await getJson("data/" + s.summary).catch(() => ({ latest: null, days: [], recent: [] })) }),
+      ),
+    );
+
+    const hereStation = stations.get(HERE_ID);
+    const chaoPhraya = [2744, 26, 2599, 4].map((id) => ({ s: stations.get(id), d: data.get(id) }));
+    const c13 = data.get(2744).summary.latest;
+    const highs = [26, 2599, 4]
+      .map((id) => {
+        const days = data.get(id).summary.days;
+        const d = days[days.length - 1];
+        return d ? `${LABELS[id].name} ${d.high.toFixed(2)}${d.partial ? " (ยังไม่ครบวัน)" : ""}` : null;
+      })
+      .filter(Boolean);
+    const staleCount = chaoPhraya.filter(({ d }) => d.summary.latest && !(ageMinutes(d.summary.latest.updatedAt) <= STALE_MINUTES)).length;
+    document.getElementById("here").innerHTML = `<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">พื้นที่ บางกรวย, บางคูเวียง จ.นนทบุรี</span></h2>
+      <ul class="here-grid">${nodeHtml(hereStation, data.get(HERE_ID))}</ul>
+      <div class="here-summary">
+        <div><b>สัญญาณจากแม่น้ำเจ้าพระยา</b> — ${c13 && typeof c13.dischargeM3s === "number" ? `อัตราการไหลท้ายเขื่อนเจ้าพระยา ≈ ${c13.dischargeM3s.toLocaleString("en")} ลบ.ม./วินาที` : "ไม่มีข้อมูลอัตราการไหลท้ายเขื่อนเจ้าพระยา"}${staleCount ? ` · <span class="health-warn">${STALE_TEXT} ${staleCount} จุด</span>` : ""}</div>
+        ${highs.length ? `<div>ระดับสูงสุดของวันนี้ (ม.รทก.): ${highs.join(" · ")}</div>` : ""}
+        <div class="here-more">ดูแผนภาพลำน้ำเจ้าพระยาด้านล่าง</div>
+      </div>`;
+
+    document.getElementById("flow").innerHTML = `<ol class="flow flow-main">${LINE.map((n) =>
+      n.you
+        ? `<li class="flow-node flow-you"><div class="flow-type">พื้นที่ของคุณ</div><div class="flow-name">${n.text}</div></li>`
+        : nodeHtml(stations.get(n.id), data.get(n.id)),
+    ).join("")}</ol>`;
   }
 
   async function renderHealth() {
@@ -120,22 +167,10 @@
     else el.textContent = `ตัวดึงข้อมูลอัตโนมัติ: ดึงสำเร็จล่าสุดเมื่อ ${formatDuration(h.ageMinutes)}ที่แล้ว`;
   }
 
-  async function main() {
-    renderHealth();
-    setInterval(renderHealth, 60000);
-    const root = document.getElementById("gauges");
-    const stations = stationsForSite("bangkruai").sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
-    for (const s of stations) {
-      try {
-        root.appendChild(await loadGauge(s));
-      } catch (err) {
-        console.error(err);
-        const card = document.createElement("div");
-        card.className = "bk-card";
-        card.innerHTML = `<div class="bk-name">${LABELS[s.id].name}</div><div class="chart-empty">โหลดข้อมูลไม่สำเร็จ</div>`;
-        root.appendChild(card);
-      }
-    }
-  }
-  main();
+  renderHealth();
+  setInterval(renderHealth, 60000);
+  render().catch((err) => {
+    console.error(err);
+    document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดข้อมูลไม่สำเร็จ</div>`;
+  });
 })();
