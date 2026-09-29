@@ -126,7 +126,7 @@
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
       <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
-      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, 24, true)}
+      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, CHART_WINDOW_H, true)}
     `;
     return card;
   }
@@ -158,7 +158,7 @@
           <span class="unit">(${latest.releaseMcm.toFixed(2)} ล้าน ลบ.ม./ชม.)</span></div>
       </div>
       <div class="station-meta" data-stale="${stale}">${meta}</div>
-      ${sparklineHtml(hourly, "releaseM3s", "reportedAt", "อัตราระบาย", "ลบ.ม./วินาที", 0, 50, 24, true)}`;
+      ${sparklineHtml(hourly, "releaseM3s", "reportedAt", "อัตราระบาย", "ลบ.ม./วินาที", 0, 50, CHART_WINDOW_H, true)}`;
   }
 
   async function loadReservoir({ file, hourlyFile, name, staleMinutes }) {
@@ -264,20 +264,44 @@
     return `<span class="trend" data-dir="${t.direction}">${arrow} ${word} ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>${note}`;
   }
 
+  // Every hourly chart shares ONE time axis: the right edge is the newest data hour across
+  // all sources, so the same x position means the same clock time in every box. A series
+  // whose newest reading is older simply stops short and is left blank up to the edge.
+  const CHART_WINDOW_H = 12;
+  let axisEndT = null;
+  async function loadAxisEnd() {
+    const files = [
+      ...STATIONS.map((s) => [s.file, "updatedAt"]),
+      ...RESERVOIRS.map((r) => [r.hourlyFile, "reportedAt"]),
+    ];
+    let newest = 0;
+    await Promise.all(
+      files.map(async ([file, key]) => {
+        const rows = await getHistory(file).catch(() => []);
+        const s = seriesOf(rows, key === "updatedAt" ? "levelMsl" : "releaseM3s", key);
+        if (s.length) newest = Math.max(newest, s[s.length - 1].t);
+      }),
+    );
+    if (newest) axisEndT = Math.ceil(newest / 3600000) * 3600000;
+  }
+
   // Small trend chart: x is real time (not index), only distinct source timestamps,
   // last 24 h. Caption prints the real span and first -> last so it can't overstate.
   function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false) {
     const all = seriesOf(rows, valueKey, timeKey);
+    const shared = hourlyAxis && axisEndT != null;
     const latestT = all.length ? all[all.length - 1].t : 0;
-    const pts = all.filter((p) => p.t >= latestT - windowHours * 3600000);
-    if (pts.length < 2) {
+    const endT = shared ? axisEndT : latestT;
+    const startT = shared ? endT - windowHours * 3600000 : null;
+    const pts = all.filter((p) => (shared ? p.t >= startT && p.t <= endT : p.t >= latestT - windowHours * 3600000));
+    if (pts.length < (shared ? 1 : 2)) {
       return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
     }
     const w = 300;
     const h = 56;
     const pad = 6;
-    const t0 = pts[0].t;
-    const tN = pts[pts.length - 1].t;
+    const t0 = shared ? startT : pts[0].t;
+    const tN = shared ? endT : pts[pts.length - 1].t;
     const vs = pts.map((p) => p.v);
     // Never auto-zoom below a meaningful range, or a 1 cm wiggle looks like a collapse.
     let min = Math.min(...vs);
@@ -294,12 +318,12 @@
     ]);
     const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
     const [ex, ey] = xy[xy.length - 1];
-    const spanH = (tN - t0) / 3600000;
+    const spanH = (pts[pts.length - 1].t - pts[0].t) / 3600000;
     // Hourly ticker: one tick per whole hour (Bangkok is UTC+7, a whole-hour offset).
     // Only for short windows; labels are HTML so the stretched svg cannot distort them.
     const HOUR = 3600000;
     const ticks = [];
-    if (hourlyAxis && spanH <= 24) {
+    if (hourlyAxis && (tN - t0) / 3600000 <= 24) {
       for (let t = Math.ceil(t0 / HOUR) * HOUR; t <= tN; t += HOUR) {
         const frac = (t - t0) / (tN - t0);
         ticks.push({ x: pad + frac * (w - pad * 2), hour: (Math.floor(t / HOUR) + 7) % 24 });
@@ -353,7 +377,7 @@
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
       <div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>${freshnessHtml(d)}</div>
-      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, 12, true, true)}</div></div></li>`;
+      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, CHART_WINDOW_H, true, true)}</div></div></li>`;
   }
 
   async function nodeData(node) {
@@ -493,8 +517,9 @@
     }
   }
 
-  function main() {
+  async function main() {
     loadHealth();
+    await loadAxisEnd();
     renderFlow().catch((err) => {
       console.error(err);
       document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ</div>`;
