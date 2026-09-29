@@ -1,14 +1,14 @@
 // Runs on a 15-minute GitHub Actions cron. Fetches ThaiWater's public
-// waterlevel feed, extracts the tracked river stations, and appends one row
-// per station to its own committed history file under data/ (never
-// overwritten — see .scratch/maeklong-photharam-water-monitor/spec.md for
+// waterlevel feed (and EGAT's reservoir table), extracts the tracked river
+// stations and dams, and appends one row per station/dam to its own committed
+// history file under data/ (never overwritten — see .scratch/maeklong-photharam-water-monitor/spec.md for
 // why this is an append-only log, not a "latest reading" snapshot).
 //
 // This script is a thin I/O wrapper: all parsing/derivation logic lives in
 // parse.js and is unit tested there. Nothing here is tested directly.
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus } = require("../parse.js");
+const { parseWaterLevelRecord, deriveStatus, parseReservoirRecord } = require("../parse.js");
 
 // ThaiWater's own React SPA's underlying data source — public, unauthenticated
 // JSON, same "undocumented but genuinely public" category as
@@ -24,6 +24,45 @@ const STATIONS = [
   { id: 710, file: "photharam.json" },
 ];
 
+// EGAT's reservoir table: a plain server-rendered HTML page, no JS needed.
+const RESERVOIR_URL = "https://water.egat.co.th/water_crisis.php";
+
+// Upstream leading-indicator dams, matched by the Thai name on the page. Each
+// has its own history series, separate from the river stations. The page has
+// no per-row timestamp, so each row is stamped with this run's scrapedAt.
+const RESERVOIRS = [
+  { name: "วชิราลงกรณ", file: "reservoir-vajiralongkorn.json" },
+  { name: "ศรีนครินทร์", file: "reservoir-srinakarin.json" },
+];
+
+function appendHistory(dataDir, file, row) {
+  const filePath = path.join(dataDir, file);
+  const history = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : [];
+  history.push(row);
+  fs.writeFileSync(filePath, JSON.stringify(history, null, 2) + "\n");
+}
+
+async function scrapeReservoirs(dataDir, scrapedAt) {
+  const res = await fetch(RESERVOIR_URL);
+  if (!res.ok) throw new Error(`${RESERVOIR_URL} -> HTTP ${res.status}`);
+  const records = parseReservoirRecord(await res.text());
+
+  for (const { name, file } of RESERVOIRS) {
+    const record = records.find((r) => r.name === name);
+    if (!record) {
+      console.error(`No row found for dam ${name} in this run — skipping, not writing a gap entry.`);
+      continue;
+    }
+    appendHistory(dataDir, file, {
+      scrapedAt,
+      storagePercent: record.storagePercent,
+      levelMsl: record.levelMsl,
+      releaseRateM3s: record.releaseRateM3s,
+    });
+    console.log(`${file}: appended storage=${record.storagePercent}% level=${record.levelMsl} release=${record.releaseRateM3s} m3/s`);
+  }
+}
+
 async function main() {
   const res = await fetch(WATERLEVEL_URL, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`${WATERLEVEL_URL} -> HTTP ${res.status}`);
@@ -34,6 +73,14 @@ async function main() {
   fs.mkdirSync(dataDir, { recursive: true });
 
   const scrapedAt = new Date().toISOString();
+
+  // The reservoir source is independent of the river source: a failure here
+  // must not stop the river stations being recorded (and vice versa below).
+  try {
+    await scrapeReservoirs(dataDir, scrapedAt);
+  } catch (err) {
+    console.error("Reservoir scrape failed:", err);
+  }
 
   for (const { id, file } of STATIONS) {
     const record = records.find((r) => r.station && r.station.id === id);

@@ -16,19 +16,19 @@ as the timestamp for each appended row.
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `parseReservoirRecord(raw)` is a pure function (no network) that
+- [x] `parseReservoirRecord(raw)` is a pure function (no network) that
       extracts `{ name, storagePercent, levelMsl, releaseRateM3s }` from the
       EGAT table's HTML for both Vajiralongkorn and Srinakarin, with unit
       tests using a captured real-response fixture
-- [ ] The 15-minute cron Action fetches `water_crisis.php`, parses both dams'
+- [x] The 15-minute cron Action fetches `water_crisis.php`, parses both dams'
       rows via the tested function, and appends one row per dam per run to a
       committed, append-only history file (separate from, or clearly
       distinguished within, the river-station history)
-- [ ] MCM/day release figures are converted to m³/s before display
-- [ ] The site renders each dam's current storage %, level, release rate,
+- [x] MCM/day release figures are converted to m³/s before display
+- [x] The site renders each dam's current storage %, level, release rate,
       and a trend chart per dam, in its own section distinct from the river
       stations (this is upstream context, not a river reading)
-- [ ] Runs independently of ticket 02 — this ticket does not depend on or
+- [x] Runs independently of ticket 02 — this ticket does not depend on or
       block the Ban Pong station work

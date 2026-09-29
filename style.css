@@ -124,3 +124,29 @@ h1 {
   font-size: 0.75rem;
   margin-left: 6px;
 }
+
+.section-title {
+  font-size: 1.1rem;
+  margin: 28px 0 4px;
+}
+
+.reservoir-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.reservoir-stats .unit {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.stat-label {
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 0.85rem;
+  margin-right: 4px;
+}

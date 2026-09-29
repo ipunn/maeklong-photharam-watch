@@ -2,7 +2,9 @@
 // No network, no DOM: only the exported pure functions.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok } = require("./parse.js");
+const fs = require("node:fs");
+const path = require("node:path");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -91,4 +93,35 @@ test("deriveStatus bands a level at/above warning but below critical as yellow",
 test("deriveStatus bands a level at/above critical as red", () => {
   assert.equal(deriveStatus(7.2, { warningM: 6.5, criticalM: 7.2 }), "red");
   assert.equal(deriveStatus(8, { warningM: 6.5, criticalM: 7.2 }), "red");
+});
+
+// Real capture of https://water.egat.co.th/water_crisis.php (28 ก.ย. 2569).
+const EGAT_HTML = fs.readFileSync(path.join(__dirname, "fixtures", "egat-water-crisis.html"), "utf8");
+const byName = (records, name) => records.find((r) => r.name === name);
+
+test("parseReservoirRecord extracts Vajiralongkorn's storage %, level and release rate from the real EGAT page", () => {
+  const dam = byName(parseReservoirRecord(EGAT_HTML), "วชิราลงกรณ");
+  // Page row: level 154.15, storage 96.32%, release 0.00 MCM/day.
+  assert.deepEqual(dam, { name: "วชิราลงกรณ", storagePercent: 96.32, levelMsl: 154.15, releaseRateM3s: 0 });
+});
+
+test("parseReservoirRecord extracts Srinakarin and converts its MCM/day release to m3/s", () => {
+  const dam = byName(parseReservoirRecord(EGAT_HTML), "ศรีนครินทร์");
+  // Page row: level 176.65, storage 92.27%, release 0.66 MCM/day
+  // == 0.66 * 1,000,000 / 86,400 = 7.64 m3/s (hand-worked, 2 dp).
+  assert.deepEqual(dam, { name: "ศรีนครินทร์", storagePercent: 92.27, levelMsl: 176.65, releaseRateM3s: 7.64 });
+});
+
+test("parseReservoirRecord returns only the two tracked dams, ignoring every other row", () => {
+  const names = parseReservoirRecord(EGAT_HTML).map((r) => r.name).sort();
+  assert.deepEqual(names, ["วชิราลงกรณ", "ศรีนครินทร์"].sort());
+});
+
+test("parseReservoirRecord omits a dam whose row is absent, and yields nulls for non-numeric cells", () => {
+  const row = (name, cells) => `<tr><td><p4>${name}</p4></td>${cells.map((c) => `<td><p4>${c}</p4></td>`).join("")}</tr>`;
+  const html = `<table>${row("ศรีนครินทร์", ["176.65", "16,374", "92.27", "1", "1", "1", "1", "1", "1", "1", "-", "1"])}</table>`;
+  const records = parseReservoirRecord(html);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].releaseRateM3s, null);
+  assert.equal(records[0].storagePercent, 92.27);
 });

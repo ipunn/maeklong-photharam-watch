@@ -32,14 +32,21 @@
     green: "ปกติ",
   };
 
-  function renderChart(history) {
+  // Upstream context, not a river reading: rendered in its own section.
+  // Rows carry no source timestamp, so freshness is judged from scrapedAt.
+  const RESERVOIRS = [
+    { file: "data/reservoir-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: 45 },
+    { file: "data/reservoir-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: 45 },
+  ];
+
+  function renderChart(history, key = "levelMsl") {
     if (history.length < 2) {
       return `<div class="chart-empty">ยังไม่มีข้อมูลย้อนหลังพอสำหรับกราฟแนวโน้ม</div>`;
     }
     const w = 600;
     const h = 120;
     const pad = 8;
-    const levels = history.map((r) => r.levelMsl).filter((v) => typeof v === "number");
+    const levels = history.map((r) => r[key]).filter((v) => typeof v === "number");
     const min = Math.min(...levels);
     const max = Math.max(...levels);
     const range = max - min || 1;
@@ -47,7 +54,7 @@
     const points = history
       .map((r, i) => {
         const x = pad + (i / (history.length - 1)) * (w - pad * 2);
-        const y = h - pad - ((r.levelMsl - min) / range) * (h - pad * 2);
+        const y = h - pad - ((r[key] - min) / range) * (h - pad * 2);
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(" ");
@@ -92,19 +99,56 @@
     return card;
   }
 
-  async function main() {
-    const root = document.getElementById("stations");
-    for (const station of STATIONS) {
+  async function loadReservoir({ file, name, staleMinutes }) {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`${file} -> HTTP ${res.status}`);
+    const history = await res.json();
+    const latest = history[history.length - 1];
+
+    const card = document.createElement("div");
+    card.className = "station-card";
+
+    if (!latest) {
+      card.innerHTML = `<div class="station-header"><span class="station-name">${name}</span></div>
+        <div class="chart-empty">ยังไม่มีข้อมูล</div>`;
+      return card;
+    }
+
+    const mins = ageMinutes(latest.scrapedAt);
+    const stale = mins > staleMinutes;
+    const fmt = (v, digits) => (typeof v === "number" ? v.toFixed(digits) : "–");
+
+    card.innerHTML = `
+      <div class="station-header"><span class="station-name">${name}</span></div>
+      <div class="station-level">${fmt(latest.storagePercent, 2)} <span class="unit">% ของความจุ</span></div>
+      <div class="reservoir-stats">
+        <div><span class="stat-label">ระดับน้ำ</span> ${fmt(latest.levelMsl, 2)} <span class="unit">ม.รทก.</span></div>
+        <div><span class="stat-label">อัตราระบาย</span> ${fmt(latest.releaseRateM3s, 2)} <span class="unit">ลบ.ม./วินาที</span></div>
+      </div>
+      <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? " — ข้อมูลอาจไม่ล่าสุด" : ""}</div>
+      ${renderChart(history, "storagePercent")}
+    `;
+    return card;
+  }
+
+  async function renderInto(rootId, items, load, nameHtml) {
+    const root = document.getElementById(rootId);
+    for (const item of items) {
       try {
-        root.appendChild(await loadStation(station));
+        root.appendChild(await load(item));
       } catch (err) {
         const card = document.createElement("div");
         card.className = "station-card";
-        card.innerHTML = `<div class="station-header">${stationNameHtml(station.name, station.role)}</div>
+        card.innerHTML = `<div class="station-header">${nameHtml(item)}</div>
           <div class="chart-empty">โหลดข้อมูลไม่สำเร็จ: ${err.message}</div>`;
         root.appendChild(card);
       }
     }
+  }
+
+  function main() {
+    renderInto("stations", STATIONS, loadStation, (s) => stationNameHtml(s.name, s.role));
+    renderInto("reservoirs", RESERVOIRS, loadReservoir, (r) => `<span class="station-name">${r.name}</span>`);
   }
 
   main();
