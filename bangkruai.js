@@ -59,7 +59,7 @@
 
   // Level against the bank, as a fact: a pill (text + shape, no severity colour, since no
   // official flood level exists) and a thin bar showing how close the level is. The bank sits in
-  // the middle, 0.75 m either side; a level outside it pins to the edge.
+  // the middle, 0.75 m either side; a level outside it pins to the edge and the scale label says "เกินสเกล".
   const BAR_BELOW_M = 0.75;
   const BAR_ABOVE_M = 0.75;
   function bankHtml(level, bank) {
@@ -77,7 +77,7 @@
         <span class="bank-tick" style="left:${pct(bank).toFixed(1)}%"></span>
         <span class="bank-dot" data-side="${c.direction}" style="left:${pct(level).toFixed(1)}%"></span>
       </div>
-      <div class="bank-scale"><span>${BAR_BELOW_M} ม.ใต้ตลิ่ง</span><span>ตลิ่ง</span><span>${BAR_ABOVE_M} ม.เหนือตลิ่ง</span></div>`;
+      <div class="bank-scale"><span>${level < bank - BAR_BELOW_M ? "◀ เกินสเกล" : `${BAR_BELOW_M} ม.ใต้ตลิ่ง`}</span><span>ตลิ่ง</span><span>${level > bank + BAR_ABOVE_M ? "เกินสเกล ▶" : `${BAR_ABOVE_M} ม.เหนือตลิ่ง`}</span></div>`;
   }
 
   // Tidal gauges: the latest two Bangkok days' high and low, one line each.
