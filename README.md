@@ -1,8 +1,8 @@
 # เฝ้าระวังระดับน้ำแม่กลอง โพธาราม
 
-Static site tracking Mae Klong river levels near Photharam, Ratchaburi
-(13°43'42.0"N 99°50'48.3"E). No gauge sits at that point, so it shows the
-two stations that bracket it, plus upstream reservoir data as a leading
+Static site tracking Mae Klong river levels near Photharam, Ratchaburi.
+No gauge sits at the exact spot, so it shows the stations along the river
+above and below the area, plus upstream reservoir data as a leading
 indicator. UI is Thai-only.
 
 A GitHub Actions cron runs every 15 minutes, scrapes the sources, and appends

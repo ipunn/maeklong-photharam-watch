@@ -14,7 +14,7 @@ Status: ready-for-agent
 
 The user needs to monitor and understand the water-level trend of the Mae
 Klong river near their location in Photharam district, Ratchaburi
-(13°43'42.0"N 99°50'48.3"E), during an active, ongoing flood event (dam
+(Photharam district), during an active, ongoing flood event (dam
 releases from upstream reservoirs began stepping up from Sep 28, 2026). No
 dedicated gauge sits at that exact coordinate, and no single existing tool
 shows both the current local reading and the upstream signal (reservoir
@@ -113,7 +113,7 @@ domain language, or deployment target.
 
 **Monitored signal**
 - **River level**: two ThaiWater stations bracketing the user's coordinate
-  (13°43'42.0"N 99°50'48.3"E), since no station sits at that exact point:
+  (Photharam district), since no station sits at that exact point:
   - Upstream: "บ้านโป่ง" / "สะพานค่ายหลวง" area, Ban Pong, Ratchaburi
     (station id 505018 in the ThaiWater feed used during research; re-verify
     id at implementation time since the feed returns ~800 records and ids may

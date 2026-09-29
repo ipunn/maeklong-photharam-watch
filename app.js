@@ -226,7 +226,7 @@
     },
     { kind: "gauge", branch: "แม่กลอง", station: STATIONS[1] },
     { kind: "gauge", branch: "แม่กลอง", station: STATIONS[2] },
-    { kind: "you", name: "ตำแหน่งของคุณ", text: "13°43′42″N 99°50′48″E — ระหว่างสะพานค่ายหลวงกับโพธาราม" },
+    { kind: "you", name: "พื้นที่ของคุณ", text: "อำเภอโพธาราม จังหวัดราชบุรี" },
     { kind: "gauge", branch: "แม่กลอง", station: STATIONS[3] },
   ];
 
