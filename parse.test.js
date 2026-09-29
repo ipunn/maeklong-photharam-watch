@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -189,4 +189,36 @@ test("parseReservoirRecord omits a dam whose row is absent, and yields nulls for
   assert.equal(records.length, 1);
   assert.equal(records[0].releaseRateM3s, null);
   assert.equal(records[0].storagePercent, 92.27);
+});
+
+// trendOf: how a series moved over the data we actually have, up to a window.
+// Rows are history rows; timeKey names the source's own timestamp (never scrapedAt,
+// which repeats an unchanged reading).
+const row = (t, v) => ({ updatedAt: `2026-09-29T${t}:00+07:00`, levelMsl: v });
+
+test("trendOf reports a rise with its real time span and change", () => {
+  const t = trendOf([row("09:00", 17.5), row("11:00", 17.6), row("12:00", 17.73)], "levelMsl", "updatedAt", 3, 0.02);
+  assert.equal(t.direction, "rising");
+  assert.equal(Number(t.delta.toFixed(2)), 0.23);
+  assert.equal(t.spanHours, 3);
+});
+
+test("trendOf only looks back as far as the window and calls a tiny change steady", () => {
+  const rows = [row("06:00", 10), row("11:00", 17.60), row("12:00", 17.61)];
+  const t = trendOf(rows, "levelMsl", "updatedAt", 3, 0.02);
+  assert.equal(t.direction, "steady");
+  assert.equal(t.spanHours, 1);
+});
+
+test("trendOf reports a fall", () => {
+  const t = trendOf([row("10:00", 54.65), row("12:00", 54.55)], "levelMsl", "updatedAt", 3, 0.02);
+  assert.equal(t.direction, "falling");
+});
+
+test("trendOf ignores repeated readings and returns null when there is too little to compare — never guesses", () => {
+  // Same source timestamp scraped several times is ONE reading.
+  const repeated = [row("12:00", 9.29), row("12:00", 9.29), row("12:00", 9.29)];
+  assert.equal(trendOf(repeated, "levelMsl", "updatedAt", 3, 0.02), null);
+  assert.equal(trendOf([], "levelMsl", "updatedAt", 3, 0.02), null);
+  assert.equal(trendOf([row("11:00", null), row("12:00", 1)], "levelMsl", "updatedAt", 3, 0.02), null);
 });

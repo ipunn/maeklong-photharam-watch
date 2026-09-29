@@ -136,6 +136,31 @@ function pickLatestDamHourly(records, damId) {
   return best;
 }
 
+// How a series moved, using only the readings we have. `timeKey` is the SOURCE's
+// own timestamp (repeated scrapes of one unchanged reading collapse to one point).
+// Compares the newest reading with the oldest one still inside `windowHours`, and
+// reports the real span so the UI never claims "3 h" when only 1 h of data exists.
+// Returns null when there aren't two distinct readings: no data, no trend.
+function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
+  const byTime = new Map();
+  for (const r of rows) {
+    const t = new Date(r[timeKey]).getTime();
+    if (!Number.isNaN(t) && typeof r[valueKey] === "number") byTime.set(t, r[valueKey]);
+  }
+  const points = [...byTime.entries()].sort((a, b) => a[0] - b[0]);
+  if (points.length < 2) return null;
+  const [latestT, latestV] = points[points.length - 1];
+  const cutoff = latestT - windowHours * 3600000;
+  const first = points.find(([t]) => t >= cutoff && t < latestT);
+  if (!first) return null;
+  const delta = latestV - first[1];
+  return {
+    delta,
+    spanHours: (latestT - first[0]) / 3600000,
+    direction: Math.abs(delta) <= tolerance ? "steady" : delta > 0 ? "rising" : "falling",
+  };
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

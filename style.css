@@ -161,3 +161,143 @@ h1 {
   font-size: 0.9rem;
   line-height: 1.5;
 }
+
+.flow-summary {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.flow {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0 0 0 22px;
+  position: relative;
+}
+
+.flow::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.35;
+  border-radius: 2px;
+}
+
+.flow-node {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.flow-node::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 16px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+
+.flow-gap {
+  border-style: dashed;
+  background: transparent;
+}
+
+.flow-gap::before {
+  background: var(--status-neutral);
+}
+
+.flow-you {
+  border-color: var(--accent);
+  background: #eef4fd;
+}
+
+.flow-you::before {
+  background: var(--status-red);
+}
+
+.flow-name {
+  font-weight: 600;
+}
+
+.flow-branch {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0 7px;
+  margin-right: 4px;
+}
+
+.flow-role {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.flow-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.flow-label {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.flow-value .unit {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.flow-meta {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+
+.flow-meta[data-stale="true"] {
+  color: var(--stale-text);
+}
+
+.trend[data-dir="rising"] {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.trend[data-dir="falling"] {
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.trend[data-dir="steady"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.howto {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 0 0 20px;
+}
+
+.howto summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
