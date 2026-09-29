@@ -14,23 +14,23 @@
   const LABELS = {
     5: { name: "คลองมหาสวัสดิ์ บางกรวย-สวนผัก", code: "BKK003", role: "จุดวัดที่ใกล้พื้นที่ที่สุด · ห่างประมาณ 4 กม.", type: "จุดวัดระดับน้ำในคลอง (ขึ้น–ลงตามน้ำทะเล)" },
     2744: { name: "ท้ายเขื่อนเจ้าพระยา", code: "C.13", role: "อ.สรรพยา จ.ชัยนาท · ต้นน้ำห่างมาก", type: "จุดวัดในแม่น้ำเจ้าพระยา", discharge: true },
-    26: { name: "สะพานนวลฉวี ปากเกร็ด", code: "CPY014", role: "อ.ปากเกร็ด นนทบุรี · ห่างประมาณ 15 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
-    2599: { name: "สามเสน", code: "C.12", role: "เขตดุสิต กรุงเทพฯ · ห่างประมาณ 5 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
-    4: { name: "สะพานกรุงเทพ", code: "CPY015", role: "เขตธนบุรี กรุงเทพฯ · ห่างประมาณ 12 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
+    26: { name: "สะพานนวลฉวี ปากเกร็ด", code: "CPY014", role: "อ.ปากเกร็ด นนทบุรี · ห่างประมาณ 18 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
+    2599: { name: "สามเสน", code: "C.12", role: "เขตดุสิต กรุงเทพฯ · ห่างประมาณ 11 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
+    4: { name: "สะพานกรุงเทพ", code: "CPY015", role: "เขตธนบุรี กรุงเทพฯ · ห่างประมาณ 17 กม.", type: "จุดวัดระดับน้ำในแม่น้ำเจ้าพระยา (ขึ้น–ลงตามน้ำทะเล)" },
   };
 
-  // Chao Phraya main line, upstream -> downstream. Order follows the river's course south
-  // from the Chao Phraya Dam (C.13, Chai Nat) to the sea: Pak Kret, Samsen, Bangkok Bridge.
-  // The area's own canals join the river through Khlong Bangkok Noi, which leaves the river
-  // between Samsen and Bangkok Bridge (see the research note in .scratch/).
+  // Chao Phraya main line, upstream -> downstream, by position along the river (latitude):
+  // C.13 (15.16 N), Pak Kret (13.95), the area (about 13.83), Samsen (13.79), Bangkok Bridge
+  // (13.70). The area's canals link to the river at both ends (Khlong Bang Kruai upstream,
+  // Khlong Bangkok Noi downstream), so it sits beside the river between Pak Kret and Samsen.
   const LINE = [
     { id: 2744 },
     { id: 26 },
-    { id: 2599 },
     {
       you: true,
-      text: "พื้นที่ของคุณ อยู่ริมคลองบางค้อ (ไม่มีจุดวัด) ต่อกับเจ้าพระยาผ่านคลองอ้อมนนท์ → คลองบางกอกน้อย ระหว่างสามเสนกับสะพานกรุงเทพ · จุดวัดใกล้สุดคือคลองมหาสวัสดิ์ (BKK003) ด้านบน (ตำแหน่งเส้นทางน้ำเป็นการอนุมานจากแผนที่)",
+      text: "พื้นที่ของคุณ อยู่ริมคลองบางค้อ (ไม่มีจุดวัด) ที่ บางกรวย นนทบุรี ตามตำแหน่งอยู่ระหว่างปากเกร็ดกับสามเสน คลองในพื้นที่ต่อกับเจ้าพระยาทั้งด้านเหนือน้ำ (คลองบางกรวย) และท้ายน้ำ (คลองอ้อมนนท์ → คลองบางกอกน้อย) จุดวัดใกล้สุดคือคลองมหาสวัสดิ์ (BKK003) ด้านบน (เส้นทางน้ำเป็นการอนุมานจากแผนที่)",
     },
+    { id: 2599 },
     { id: 4 },
   ];
   const HERE_ID = 5;
