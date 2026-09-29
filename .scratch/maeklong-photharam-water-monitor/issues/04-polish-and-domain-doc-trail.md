@@ -25,15 +25,20 @@ documented, and establishes this new repo's own domain-modeling trail
 
 **Blocked by:** 02, 03
 
-**Status:** ready-for-agent
+**Status:** in-progress (live Pages check pending push)
 
-- [ ] All UI text reviewed and confirmed Thai-only, no leftover English
+- [x] All UI text reviewed and confirmed Thai-only, no leftover English
       scaffolding text
-- [ ] README documents both data sources, their undocumented-but-public
+- [x] README documents both data sources, their undocumented-but-public
       nature, and the refresh cadence
-- [ ] ADR written documenting the ThaiWater public-endpoint trade-off for
+- [x] ADR written documenting the ThaiWater public-endpoint trade-off for
       this repo
-- [ ] `CONTEXT.md` contains at least the domain terms that actually
+- [x] `CONTEXT.md` contains at least the domain terms that actually
       crystallized during tickets 01-03
 - [ ] Live GitHub Pages deployment verified showing current data for both
       river stations and both reservoirs, each with a working trend chart
+
+
+## Comments
+
+All but the live GitHub Pages verification is done. That needs the repo pushed to GitHub with Pages enabled; nothing has been pushed.

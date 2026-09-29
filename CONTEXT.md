@@ -7,3 +7,5 @@
 **Status** — red/yellow/green severity of a reading, derived only from thresholds the source publishes for that station. With no published threshold the status is **neutral** (null); we never guess one.
 
 **History** — the append-only per-station log of readings under `data/`; never overwritten.
+
+**Reservoir** — one of the two EGAT dams (Vajiralongkorn, Srinakarin) shown as the upstream leading indicator. Not a Station: it has storage %, level and release rate rather than a river reading, and no per-row source timestamp, so its age is measured from `scrapedAt`. Release is shown in m³/s (converted from EGAT's MCM/day).
