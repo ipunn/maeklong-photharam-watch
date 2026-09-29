@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Bang Kruai page, first gauge end to end).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Each id is re-verified by name against the live feed when added.
 - [ ] A fixture is captured from a real feed record for each of the three gauges and parsed with the existing river parser.

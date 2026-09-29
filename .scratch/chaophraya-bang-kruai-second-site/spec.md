@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # Second Site: พื้นที่ บางกรวย, บางคูเวียง (Bang Kruai) — Spec
 

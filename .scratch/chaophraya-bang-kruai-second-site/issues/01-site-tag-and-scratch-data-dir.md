@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Each configured station has exactly one Site; the Mae Klong stations are tagged Mae Klong.
 - [ ] A test asserts each Site returns exactly its own stations, no station belongs to two Sites, and every configured station has a Site.

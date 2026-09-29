@@ -22,6 +22,8 @@ const {
   parseDamHourlyRecord,
   pickLatestDamHourly,
   isSameReading,
+  dailyHighLow,
+  seriesOf,
   TRACKED_STATIONS,
 } = require("../parse.js");
 
@@ -66,13 +68,28 @@ function writeJsonAtomic(file, value) {
 }
 
 // Appends the row unless the source's reading is unchanged since the last stored row.
-function appendHistory(file, row) {
+// `onHistory` (optional) receives the full history after a successful append.
+function appendHistory(file, row, onHistory) {
   const history = readJson(file, []);
   if (!Array.isArray(history)) throw new Error(`${file} is not a JSON array`);
   if (isSameReading(history[history.length - 1], row)) return "unchanged";
   history.push(row);
   writeJsonAtomic(file, history);
+  if (onHistory) onHistory(history);
   return "appended";
+}
+
+// How much recent raw history the page's chart gets (it never downloads the full history).
+const SUMMARY_RECENT_HOURS = 48;
+
+// Small derived file per Bang Kruai gauge: the latest reading, daily high/low (tidal gauges
+// only) and the last SUMMARY_RECENT_HOURS of readings. Derived from the raw history, which stays the record.
+function writeSummary(summaryFile, history, tidal, nowMs) {
+  const cutoff = nowMs - SUMMARY_RECENT_HOURS * 3600000;
+  const recent = seriesOf(history, "levelMsl", "updatedAt")
+    .filter((p) => p.t >= cutoff)
+    .map((p) => ({ t: new Date(p.t).toISOString(), v: p.v }));
+  writeJsonAtomic(summaryFile, { latest: history[history.length - 1] || null, days: tidal ? dailyHighLow(history, nowMs) : [], recent });
 }
 
 async function fetchOk(url, asJson) {
@@ -107,19 +124,27 @@ const succeeded = (outcomes) => outcomes.includes("found") && !outcomes.includes
 async function scrapeRivers(scrapedAt) {
   const raw = await fetchOk(WATERLEVEL_URL, true);
   const records = (raw.waterlevel_data && raw.waterlevel_data.data) || [];
-  const outcomes = TRACKED_STATIONS.map(({ id, file }) =>
+  const outcomes = TRACKED_STATIONS.map(({ id, file, summary, tidal }) =>
     runItem(file, () => {
       // Number() so a feed that starts sending ids as strings is not silently skipped.
       const record = records.find((r) => r.station && Number(r.station.id) === id);
       if (!record) throw missing(`station ${id}`);
       const parsed = parseWaterLevelRecord(record);
-      const result = appendHistory(file, {
+      const row = {
         scrapedAt,
         updatedAt: parsed.updatedAt,
         levelMsl: parsed.levelMsl,
         bankMsl: parsed.bankMsl,
         status: deriveStatus(parsed.levelMsl, parsed.thresholds),
-      });
+      };
+      // Discharge only where the source supplies it, so other gauges' rows keep their shape.
+      if (parsed.dischargeM3s != null) row.dischargeM3s = parsed.dischargeM3s;
+      const nowMs = new Date(scrapedAt).getTime();
+      const result = appendHistory(file, row, summary && ((h) => writeSummary(summary, h, tidal, nowMs)));
+      // First run after the summary was introduced: build it from the existing history.
+      if (summary && result === "unchanged" && !fs.existsSync(path.join(DATA_DIR, summary))) {
+        writeSummary(summary, readJson(file, []), tidal, nowMs);
+      }
       return `${result} level=${parsed.levelMsl} updatedAt=${parsed.updatedAt}`;
     }),
   );

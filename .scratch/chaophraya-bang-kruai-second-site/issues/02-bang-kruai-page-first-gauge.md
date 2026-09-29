@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Site tag and scratch data folder).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] BKK003's id is re-verified by name against the live feed when added (ADR 0001).
 - [ ] The bank comparison is a pure function, tested for above, below, exactly at the bank, and null when either level or bank is missing.

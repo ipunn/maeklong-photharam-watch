@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Bang Kruai page, first gauge end to end).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Tests, from a real captured C.13 record: discharge parsed from the feed's string to a number; `null` for gauges without discharge (for example C.12) and for non-numeric values; never 0.
 - [ ] Existing Mae Klong parse tests still pass unchanged.

@@ -8,11 +8,34 @@ official notice**: follow Ratchaburi province, DDPM (1784) and the Royal Irrigat
 A GitHub Actions workflow scrapes the sources every ~15 minutes and appends to per-series
 history files under `data/`; GitHub Pages serves the site. No build step, no backend.
 
+## Two Sites
+
+The repo serves two watched places (**Sites**), sharing one Collector and one `data/` folder:
+
+- `index.html` — อ.โพธาราม (Mae Klong), described above.
+- `bangkruai.html` — พื้นที่ บางกรวย, บางคูเวียง (อ.บางกรวย, นนทบุรี). **คลองบางค้อ, the canal nearest
+  the area, has no gauge**, so the page shows nearby *proxy gauges* side by side with no headline:
+  BKK003 (คลองมหาสวัสดิ์), C.12, CPY014, CPY015 (Chao Phraya, tidal) and C.13 ท้ายเขื่อนเจ้าพระยา
+  (river discharge below the barrage, not a dam release). No status colour, no alerts. Tidal
+  gauges show each Bangkok day's high and low instead of a rising/falling arrow. Levels are stated
+  against the source's bank height ("สูงกว่า/ต่ำกว่าตลิ่ง"), which is a fact, not a flood level.
+
+Which station belongs to which Site lives in `TRACKED_STATIONS` in `parse.js`.
+For each Bang Kruai gauge the Collector also writes `data/daily-<gauge>.json` (daily high/low
+for tidal gauges + the latest reading and the last 48 h of readings), derived from the raw history, so the page never
+downloads the full history.
+
+**Known trade-off — history growth.** The Bang Kruai gauges report about every 10 minutes and the
+tide changes almost every reading, so their raw history files grow roughly ten times faster than
+Mae Klong's hourly ones. Accepted for now; compacting old raw rows is deferred. To check the size:
+`du -h data/`. To verify a Collector change without touching the repo's data, run
+`DATA_DIR=/some/scratch/dir npm run scrape`.
+
 ## Data sources
 
 | Data | Source | Notes |
 | --- | --- | --- |
-| River gauges: K.58 บ้านปากแซง, K.11A บ้านวังขนาย, K.55A สะพานค่ายหลวง, โพธาราม | ThaiWater `waterlevel_load` JSON | Undocumented but public; no SLA; may change without notice ([ADR 0001](docs/adr/0001-thaiwater-undocumented-public-endpoint.md)). Gauges report roughly every 10 min to 1 h and ThaiWater can lag. |
+| River gauges: K.58 บ้านปากแซง, K.11A บ้านวังขนาย, K.55A สะพานค่ายหลวง, โพธาราม; Bang Kruai Site: BKK003, C.12, CPY014, CPY015, C.13 (C.13 also carries `discharge`) | ThaiWater `waterlevel_load` JSON | Undocumented but public; no SLA; may change without notice ([ADR 0001](docs/adr/0001-thaiwater-undocumented-public-endpoint.md)). Gauges report roughly every 10 min to 1 h and ThaiWater can lag. |
 | Dam release, stored volume, level (hourly) | ThaiWater `analyst/dam` JSON (`dam_hourly`) | Same caveats. Release and inflow are million m³ per hour, converted to m³/s. Unit confirmed by mass balance: `.scratch/**/research/thaiwater-dam-feed-units.md`. |
 | Dam storage % (daily), used to back out capacity | EGAT `water.egat.co.th/water_crisis.php` HTML table | Scraped HTML; columns are read by position, so a layout change breaks it (caught by the fixture test). A daily report stamped as of the previous midnight. |
 

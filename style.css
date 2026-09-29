@@ -842,3 +842,8 @@ h1 {
 .here:empty {
   display: none;
 }
+
+.site-switch {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}

@@ -30,7 +30,48 @@ function parseWaterLevelRecord(raw) {
     bankMsl: station.min_bank != null ? Number(station.min_bank) : null,
     updatedAt: toIsoBangkok(raw.waterlevel_datetime),
     thresholds,
+    // Only some gauges (e.g. C.13) carry a discharge; the feed sends it as a string.
+    dischargeM3s: strictNumberOrNull(raw.discharge),
   };
+}
+
+// Like Number(), but blank/whitespace/non-numeric become null — Number("") is 0, and a
+// missing discharge must never read as "no flow".
+function strictNumberOrNull(v) {
+  if (v == null || (typeof v === "string" && v.trim() === "")) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Where a level sits against the bank, as a fact (not a Status, not a flood level).
+// Null when either input is missing. Difference is in metres, 2 dp, always >= 0.
+function bankComparison(levelMsl, bankMsl) {
+  const ok = (v) => typeof v === "number" && Number.isFinite(v);
+  if (!ok(levelMsl) || !ok(bankMsl)) return null;
+  const diffM = Math.round(Math.abs(levelMsl - bankMsl) * 100) / 100;
+  const direction = diffM === 0 ? "at" : levelMsl > bankMsl ? "above" : "below";
+  return { direction, diffM };
+}
+
+// One entry per Bangkok calendar day: the day's high and low (with the source times of each).
+// Days come from the source's `updatedAt`, never `scrapedAt`. Rows with a non-numeric level or
+// unreadable time are ignored. The day containing `nowMs` is still filling, so it is marked
+// `partial`. Bangkok has no DST, so the fixed +7 h offset is exact.
+function dailyHighLow(rows, nowMs) {
+  const BKK_MS = 7 * 3600000;
+  const dayOf = (ms) => new Date(ms + BKK_MS).toISOString().slice(0, 10);
+  const today = dayOf(nowMs);
+  const days = new Map();
+  for (const r of rows) {
+    const ms = new Date(r.updatedAt).getTime();
+    if (Number.isNaN(ms) || typeof r.levelMsl !== "number" || !Number.isFinite(r.levelMsl)) continue;
+    const date = dayOf(ms);
+    const d = days.get(date) || { date, high: -Infinity, highAt: null, low: Infinity, lowAt: null, partial: date === today };
+    if (r.levelMsl > d.high) (d.high = r.levelMsl), (d.highAt = r.updatedAt);
+    if (r.levelMsl < d.low) (d.low = r.levelMsl), (d.lowAt = r.updatedAt);
+    days.set(date, d);
+  }
+  return [...days.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
 // Bands a station's current level against its own sourced thresholds.
@@ -240,7 +281,7 @@ function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
 
 // A Site is a watched place with its own gauges and page (see CONTEXT.md). Every tracked
 // river gauge belongs to exactly one Site; the Collector serves them all in one run.
-const SITES = ["maeklong"];
+const SITES = ["maeklong", "bangkruai"];
 
 // Tracked river gauges, by ThaiWater station id, upstream to downstream within a Site.
 // All verified against the live feed (the spec's original id 505018 turned out to be K.58
@@ -251,6 +292,14 @@ const TRACKED_STATIONS = [
   { id: 2679, file: "wang-khanai.json", site: "maeklong" },
   { id: 832066, file: "khai-luang.json", site: "maeklong" },
   { id: 710, file: "photharam.json", site: "maeklong" },
+  // Bang Kruai Site (proxy gauges; ids re-verified by name against the live feed 2026-09-29).
+  // `tidal` is configuration, not inferred: tidal gauges get a daily high/low, not a trend.
+  // `summary` is the small per-gauge file the page reads instead of the full 10-minute history.
+  { id: 5, file: "bkk003.json", summary: "daily-bkk003.json", site: "bangkruai", tidal: true }, // BKK003 คลองมหาสวัสดิ บางกรวย-สวนผัก
+  { id: 2599, file: "c12.json", summary: "daily-c12.json", site: "bangkruai", tidal: true }, // C.12 สามเสน
+  { id: 26, file: "cpy014.json", summary: "daily-cpy014.json", site: "bangkruai", tidal: true }, // CPY014 สะพานนวลฉวี ปากเกร็ด
+  { id: 4, file: "cpy015.json", summary: "daily-cpy015.json", site: "bangkruai", tidal: true }, // CPY015 สะพานกรุงเทพ
+  { id: 2744, file: "c13.json", summary: "daily-c13.json", site: "bangkruai", tidal: false }, // C.13 ท้ายเขื่อนเจ้าพระยา
 ];
 
 function stationsForSite(site) {
@@ -258,5 +307,5 @@ function stationsForSite(site) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Bang Kruai page, first gauge end to end).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Tests for the daily function: a day with a clear high and low; the times of each; the Bangkok-midnight boundary (readings at 23:50 and 00:10 fall on different days regardless of the runtime timezone); out-of-order rows; non-numeric levels ignored; a single-reading day; empty input.
 - [ ] The current, incomplete day is excluded or clearly marked partial.

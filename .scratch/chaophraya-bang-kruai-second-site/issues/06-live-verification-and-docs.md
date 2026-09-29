@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04 and 05.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] A live run into a scratch folder found all five Bang Kruai stations and left the repo's `data/` untouched.
 - [ ] Mae Klong history and page output are identical to before for the same feed data.

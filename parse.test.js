@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -361,4 +361,132 @@ test("every tracked station has exactly one known Site and no station is listed 
   assert.equal(new Set(ids).size, ids.length);
   const files = TRACKED_STATIONS.map((s) => s.file);
   assert.equal(new Set(files).size, files.length);
+});
+
+// Real records captured from the waterlevel_load feed on 2026-09-29 for the Bang Kruai Site,
+// trimmed to the fields parseWaterLevelRecord reads.
+const RAW_BKK003 = {
+  waterlevel_datetime: "2026-09-29 19:30",
+  waterlevel_msl: "2.15",
+  discharge: null,
+  station: { id: 5, tele_station_name: { th: "คลองมหาสวัสดิ บางกรวย-สวนผัก" }, min_bank: 2.07, warning_level_m: null, critical_level_m: null },
+};
+const RAW_C12 = {
+  waterlevel_datetime: "2026-09-29 20:00",
+  waterlevel_msl: "2.06",
+  discharge: null,
+  station: { id: 2599, tele_station_name: { th: "กรมชลประทานสามเสน" }, min_bank: 2.26, warning_level_m: null, critical_level_m: null },
+};
+const RAW_CPY014 = {
+  waterlevel_datetime: "2026-09-29 20:40",
+  waterlevel_msl: "2.51",
+  discharge: null,
+  station: { id: 26, tele_station_name: { th: "สะพานนวลฉวี" }, min_bank: 2.5, warning_level_m: null, critical_level_m: null },
+};
+const RAW_CPY015 = {
+  waterlevel_datetime: "2026-09-29 20:40",
+  waterlevel_msl: "1.40",
+  discharge: null,
+  station: { id: 4, tele_station_name: { th: "สะพานกรุงเทพ" }, min_bank: 2.16, warning_level_m: null, critical_level_m: null },
+};
+const RAW_C13 = {
+  waterlevel_datetime: "2026-09-29 20:00",
+  waterlevel_msl: "14.74",
+  discharge: "2022.00",
+  station: { id: 2744, tele_station_name: { th: "ท้ายเขื่อนเจ้าพระยา" }, min_bank: 16.34, warning_level_m: null, critical_level_m: 16.34 },
+};
+
+test("parseWaterLevelRecord parses each Bang Kruai gauge with the one river parser", () => {
+  const expected = [
+    [RAW_BKK003, 5, 2.15, 2.07],
+    [RAW_C12, 2599, 2.06, 2.26],
+    [RAW_CPY014, 26, 2.51, 2.5],
+    [RAW_CPY015, 4, 1.4, 2.16],
+    [RAW_C13, 2744, 14.74, 16.34],
+  ];
+  for (const [raw, id, level, bank] of expected) {
+    const p = parseWaterLevelRecord(raw);
+    assert.equal(p.stationId, id);
+    assert.equal(p.levelMsl, level);
+    assert.equal(p.bankMsl, bank);
+    assert.equal(p.thresholds, null);
+    assert.equal(deriveStatus(p.levelMsl, p.thresholds), null);
+  }
+});
+
+test("C.13's critical_level_m (equal to its bank) is not a threshold: no warning level, so neutral", () => {
+  const p = parseWaterLevelRecord(RAW_C13);
+  assert.equal(p.thresholds, null);
+});
+
+test("parseWaterLevelRecord reads discharge as a number, null when absent or non-numeric — never 0", () => {
+  assert.equal(parseWaterLevelRecord(RAW_C13).dischargeM3s, 2022);
+  assert.equal(parseWaterLevelRecord(RAW_C12).dischargeM3s, null);
+  for (const bad of ["", " ", "-", "n/a", undefined]) {
+    assert.equal(parseWaterLevelRecord({ ...RAW_C13, discharge: bad }).dischargeM3s, null, JSON.stringify(bad));
+  }
+  assert.equal(parseWaterLevelRecord({ ...RAW_C13, discharge: "0.00" }).dischargeM3s, 0); // a real zero is kept
+});
+
+test("bankComparison states where the level sits against the bank, with the difference in metres", () => {
+  assert.deepEqual(bankComparison(2.15, 2.07), { direction: "above", diffM: 0.08 });
+  assert.deepEqual(bankComparison(1.4, 2.16), { direction: "below", diffM: 0.76 });
+  assert.deepEqual(bankComparison(2.5, 2.5), { direction: "at", diffM: 0 });
+});
+
+test("bankComparison is null when the level or the bank is missing — never guesses", () => {
+  assert.equal(bankComparison(null, 2.07), null);
+  assert.equal(bankComparison(2.15, null), null);
+  assert.equal(bankComparison(undefined, undefined), null);
+  assert.equal(bankComparison(NaN, 2), null);
+});
+
+const histRow = (updatedAt, levelMsl, scrapedAt = "2026-09-30T00:00:00Z") => ({ scrapedAt, updatedAt, levelMsl });
+const NOW = new Date("2026-09-30T12:00:00+07:00").getTime();
+
+test("dailyHighLow gives a day's high and low with their times", () => {
+  const days = dailyHighLow(
+    [histRow("2026-09-28T03:00:00+07:00", 1.2), histRow("2026-09-28T09:10:00+07:00", 2.4), histRow("2026-09-28T15:00:00+07:00", 0.9), histRow("2026-09-28T21:00:00+07:00", 2.1)],
+    NOW,
+  );
+  assert.deepEqual(days, [
+    { date: "2026-09-28", high: 2.4, highAt: "2026-09-28T09:10:00+07:00", low: 0.9, lowAt: "2026-09-28T15:00:00+07:00", partial: false },
+  ]);
+});
+
+test("dailyHighLow splits days at Bangkok midnight, whatever the runtime timezone", () => {
+  const days = dailyHighLow([histRow("2026-09-28T23:50:00+07:00", 2), histRow("2026-09-29T00:10:00+07:00", 1)], NOW);
+  assert.deepEqual(days.map((d) => [d.date, d.high, d.low]), [["2026-09-28", 2, 2], ["2026-09-29", 1, 1]]);
+});
+
+test("dailyHighLow uses updatedAt, not scrapedAt, and copes with out-of-order rows", () => {
+  const days = dailyHighLow(
+    [histRow("2026-09-29T10:00:00+07:00", 1.5, "2026-09-30T05:00:00Z"), histRow("2026-09-28T10:00:00+07:00", 2.5, "2026-09-30T06:00:00Z"), histRow("2026-09-29T02:00:00+07:00", 0.5, "2026-09-30T04:00:00Z")],
+    NOW,
+  );
+  assert.deepEqual(days.map((d) => [d.date, d.high, d.low]), [["2026-09-28", 2.5, 2.5], ["2026-09-29", 1.5, 0.5]]);
+});
+
+test("dailyHighLow ignores non-numeric levels and unreadable times", () => {
+  const days = dailyHighLow([histRow("2026-09-28T10:00:00+07:00", null), histRow("2026-09-28T11:00:00+07:00", "x"), histRow("bad", 3), histRow("2026-09-28T12:00:00+07:00", 1.1)], NOW);
+  assert.deepEqual(days.map((d) => [d.date, d.high, d.low]), [["2026-09-28", 1.1, 1.1]]);
+});
+
+test("dailyHighLow handles a single-reading day and empty input", () => {
+  assert.equal(dailyHighLow([histRow("2026-09-28T10:00:00+07:00", 1.1)], NOW).length, 1);
+  assert.deepEqual(dailyHighLow([], NOW), []);
+});
+
+test("dailyHighLow marks the current Bangkok day partial, and only that day", () => {
+  const days = dailyHighLow([histRow("2026-09-29T10:00:00+07:00", 1), histRow("2026-09-30T00:05:00+07:00", 1.2)], NOW);
+  assert.deepEqual(days.map((d) => [d.date, d.partial]), [["2026-09-29", false], ["2026-09-30", true]]);
+});
+
+test("Bang Kruai Site gauges: exactly its five, tidal set in config, none shared with Mae Klong", () => {
+  const bk = stationsForSite("bangkruai");
+  assert.deepEqual(bk.map((s) => s.id), [5, 2599, 26, 4, 2744]);
+  assert.deepEqual(bk.filter((s) => s.tidal).map((s) => s.id), [5, 2599, 26, 4]);
+  const mk = new Set(stationsForSite("maeklong").map((s) => s.id));
+  assert.ok(bk.every((s) => !mk.has(s.id)));
+  assert.equal(TRACKED_STATIONS.length, bk.length + mk.size);
 });

@@ -8,6 +8,8 @@
 
 **Tide** — the twice-daily rise and fall of a tidal Gauge (Chao Phraya and its canals, unlike Mae Klong). A rising/falling trend is not meaningful there; the page shows each day's high and low instead.
 
+**Daily summary** — the small derived file `data/daily-<gauge>.json` per Bang Kruai gauge: each Bangkok day's high and low (tidal gauges; today is marked partial) plus the last 48 h of readings. Derived from History, never a replacement for it.
+
 **Dam** — Vajiralongkorn (แควน้อย) or Srinakarin (แควใหญ่). The two rivers merge at ปากแพรก, Kanchanaburi, into the Mae Klong. A dam is not a Gauge: it has stored volume, level and release rather than a river reading.
 
 **Reading** — one value set reported by a source at *its own* time (`updatedAt` for gauges, `reportedAt` for dams), distinct from `scrapedAt` (when we fetched it). Freshness is always judged from the source's own time, never from `scrapedAt`. Any reading older than 6 hours is flagged "ข้อมูลอาจไม่อัพเดทล่าสุด". The one exception is EGAT's daily table, which is stamped as of the previous midnight and is flagged after 36 hours.
