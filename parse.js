@@ -298,6 +298,26 @@ function tideTrend(days) {
   };
 }
 
+// One value per Bangkok day from a series of reports, newest `maxDays` days, oldest first.
+// A report stamped exactly midnight (EGAT's daily table, "24.00 น.") is the end of the day that
+// just finished, so its day is the minute before. Where a day has several reports the one with
+// the newest source time wins. Non-numeric values and unreadable times are ignored.
+function dailyValues(rows, valueKey, timeKey, maxDays = 7) {
+  const BKK_MS = 7 * 3600000;
+  const byDay = new Map();
+  for (const r of rows) {
+    const ms = new Date(r[timeKey]).getTime();
+    if (r[timeKey] == null || Number.isNaN(ms) || typeof r[valueKey] !== "number" || !Number.isFinite(r[valueKey])) continue;
+    const date = new Date(ms - 60000 + BKK_MS).toISOString().slice(0, 10);
+    const prev = byDay.get(date);
+    if (!prev || ms >= prev.ms) byDay.set(date, { ms, v: r[valueKey] });
+  }
+  return [...byDay.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .slice(-maxDays)
+    .map(([date, { v }]) => ({ date, v }));
+}
+
 // A Site is a watched place with its own gauges and page (see CONTEXT.md). Every tracked
 // river gauge belongs to exactly one Site; the Collector serves them all in one run.
 const SITES = ["maeklong", "bangkruai"];
@@ -326,5 +346,5 @@ function stationsForSite(site) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

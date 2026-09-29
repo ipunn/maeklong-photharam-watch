@@ -194,7 +194,7 @@
         <div><span class="stat-label">อัตราระบายเฉลี่ยรายวัน (กฟผ.)</span> ${fmt(latest.releaseRateM3s, 2)} <span class="unit">ลบ.ม./วินาที</span></div>
       </div>
       <div class="station-meta" data-stale="${stale}">${metaText}</div>
-      ${sparklineHtml(history, "storagePercent", "reportedAt", "% ความจุ (รายงานรายวัน 1 จุด/วัน)", "%", 2, 1, 24 * 30)}
+      ${barsHtml(history, "storagePercent", "reportedAt", "% ของความจุ (รายงานรายวัน สูงสุด 7 วัน)")}
     `;
     return card;
   }
@@ -283,6 +283,23 @@
       }),
     );
     if (newest) axisEndT = Math.ceil(newest / 3600000) * 3600000;
+  }
+
+  // Daily bar chart for a once-a-day report: one bar per day (newest 7), scaled 0-100 % of
+  // capacity (or the max if it is over 100), value above each bar and the day below.
+  function barsHtml(rows, valueKey, timeKey, label) {
+    const days = dailyValues(rows, valueKey, timeKey, 7);
+    if (!days.length) return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
+    const top = Math.max(100, ...days.map((d) => d.v));
+    const dayFmt = new Intl.DateTimeFormat("th-TH", { timeZone: "UTC", day: "numeric", month: "short" });
+    const cols = days
+      .map(
+        (d) => `<div class="bar-col"><span class="bar-val">${d.v.toFixed(1)}</span>
+          <div class="bar-track"><div class="bar" style="height:${((d.v / top) * 100).toFixed(1)}%"></div></div>
+          <span class="bar-day">${dayFmt.format(new Date(`${d.date}T00:00:00Z`))}</span></div>`,
+      )
+      .join("");
+    return `<div class="spark"><div class="spark-label">${label}</div><div class="bars" role="img" aria-label="${label}">${cols}</div></div>`;
   }
 
   // Small trend chart: x is real time (not index), only distinct source timestamps,

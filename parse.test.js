@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -506,4 +506,24 @@ test("tideTrend gives no change when the previous day is missing or not the day 
 test("tideTrend is null with no full day yet", () => {
   assert.equal(tideTrend([]), null);
   assert.equal(tideTrend([D("2026-09-29", 2.4, 1.1, true)]), null);
+});
+
+const rep = (reportedAt, storagePercent, scrapedAt = "2026-10-01T00:00:00Z") => ({ scrapedAt, reportedAt, storagePercent });
+
+test("dailyValues gives one value per report day; EGAT's midnight stamp belongs to the day that just ended", () => {
+  const days = dailyValues([rep("2026-09-29T00:00:00+07:00", 92.3), rep("2026-09-28T00:00:00+07:00", 92.1)], "storagePercent", "reportedAt");
+  assert.deepEqual(days, [{ date: "2026-09-27", v: 92.1 }, { date: "2026-09-28", v: 92.3 }]);
+});
+
+test("dailyValues keeps the latest report per day, drops non-numbers and unreadable times, and caps at the newest N days", () => {
+  const rows = [
+    rep("2026-09-29T00:00:00+07:00", 90), rep("2026-09-29T00:00:00+07:00", 91, "2026-10-02T00:00:00Z"),
+    rep("2026-09-28T00:00:00+07:00", null), rep(null, 50), rep("bad", 60),
+    ...[20, 21, 22, 23, 24, 25, 26, 27].map((d, i) => rep(`2026-09-${d}T00:00:00+07:00`, 80 + i)),
+  ];
+  const days = dailyValues(rows, "storagePercent", "reportedAt", 7);
+  assert.equal(days.length, 7);
+  assert.deepEqual(days[days.length - 1], { date: "2026-09-28", v: 91 });
+  assert.equal(days[0].date, "2026-09-21");
+  assert.deepEqual(dailyValues([], "storagePercent", "reportedAt", 7), []);
 });
