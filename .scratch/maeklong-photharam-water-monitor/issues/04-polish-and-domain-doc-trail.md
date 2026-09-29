@@ -25,7 +25,7 @@ documented, and establishes this new repo's own domain-modeling trail
 
 **Blocked by:** 02, 03
 
-**Status:** in-progress (live Pages check pending push)
+**Status:** in-progress (waiting on the 3-hour unattended-collection check; started 08:20 UTC 2026-09-29)
 
 - [x] All UI text reviewed and confirmed Thai-only, no leftover English
       scaffolding text
@@ -35,8 +35,13 @@ documented, and establishes this new repo's own domain-modeling trail
       this repo
 - [x] `CONTEXT.md` contains at least the domain terms that actually
       crystallized during tickets 01-03
-- [ ] Live GitHub Pages deployment verified showing current data for both
-      river stations and both reservoirs, each with a working trend chart
+- [ ] Live GitHub Pages deployment verified: both river stations and both
+      dams show current data with their own timestamps; each gauge has a working
+      hourly trend chart; the collector keeps running unattended for at least 3
+      hours with no gap over 30 minutes between runs. (Reworded 2026-09-29: dam
+      trend charts were removed on purpose; the dam's EGAT daily chart appears
+      once two daily reports exist. The site's health line warns if collection
+      stops.)
 
 
 ## Comments
