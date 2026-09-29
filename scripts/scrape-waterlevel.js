@@ -8,7 +8,7 @@
 // parse.js and is unit tested there. Nothing here is tested directly.
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, parseReservoirRecord, parseReservoirReportDate } = require("../parse.js");
+const { parseWaterLevelRecord, deriveStatus, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly } = require("../parse.js");
 
 // ThaiWater's own React SPA's underlying data source — public, unauthenticated
 // JSON, same "undocumented but genuinely public" category as
@@ -16,10 +16,14 @@ const { parseWaterLevelRecord, deriveStatus, parseReservoirRecord, parseReservoi
 // ADR-0004). Can change or break without notice; no SLA.
 const WATERLEVEL_URL = "https://api-v3.thaiwater.net/api/v1/thaiwater30/public/waterlevel_load";
 
-// Tracked stations, by ThaiWater station id: the upstream/downstream pair
-// bracketing the user's coordinate. 832066 (สะพานค่ายหลวง, Ban Pong) is the
-// upstream one; 505018 named in the spec is now a Sai Yok station.
+// Tracked stations, by ThaiWater station id, upstream to downstream. The last two
+// bracket the user's coordinate; the first two are early-warning gauges further
+// up the Mae Klong system (both verified against the live feed, not the spec's
+// original ids): 505018 บ้านปากแซง (แควน้อย, K.58, Sai Yok) and 2679 บ้านวังขนาย
+// (แม่กลอง, Tha Muang). 832066 (สะพานค่ายหลวง, Ban Pong) is upstream of 710.
 const STATIONS = [
+  { id: 505018, file: "pak-saeng.json" },
+  { id: 2679, file: "wang-khanai.json" },
   { id: 832066, file: "khai-luang.json" },
   { id: 710, file: "photharam.json" },
 ];
@@ -33,6 +37,13 @@ const RESERVOIR_URL = "https://water.egat.co.th/water_crisis.php";
 const RESERVOIRS = [
   { name: "วชิราลงกรณ", file: "reservoir-vajiralongkorn.json" },
   { name: "ศรีนครินทร์", file: "reservoir-srinakarin.json" },
+];
+
+// ThaiWater's dam feed: hourly, with its own timestamp (unlike EGAT's daily table).
+const DAM_HOURLY_URL = "https://api-v3.thaiwater.net/api/v1/thaiwater30/analyst/dam";
+const DAMS_HOURLY = [
+  { id: 56, file: "dam-hourly-vajiralongkorn.json" },
+  { id: 54, file: "dam-hourly-srinakarin.json" },
 ];
 
 function appendHistory(dataDir, file, row) {
@@ -68,6 +79,32 @@ async function scrapeReservoirs(dataDir, scrapedAt) {
   }
 }
 
+async function scrapeDamsHourly(dataDir, scrapedAt) {
+  const res = await fetch(DAM_HOURLY_URL, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`${DAM_HOURLY_URL} -> HTTP ${res.status}`);
+  const raw = await res.json();
+  const records = (raw.data && raw.data.dam_hourly) || [];
+
+  for (const { id, file } of DAMS_HOURLY) {
+    const record = pickLatestDamHourly(records, id);
+    if (!record) {
+      console.error(`No hourly record for dam ${id} in this run — skipping, not writing a gap entry.`);
+      continue;
+    }
+    const p = parseDamHourlyRecord(record);
+    appendHistory(dataDir, file, {
+      scrapedAt,
+      reportedAt: p.reportedAt,
+      levelMsl: p.levelMsl,
+      storageMcm: p.storageMcm,
+      inflowMcm: p.inflowMcm,
+      releaseMcm: p.releaseMcm,
+      releaseM3s: p.releaseM3s,
+    });
+    console.log(`${file}: appended release=${p.releaseMcm} MCM/h (~${p.releaseM3s} m3/s) reportedAt=${p.reportedAt}`);
+  }
+}
+
 async function main() {
   const res = await fetch(WATERLEVEL_URL, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`${WATERLEVEL_URL} -> HTTP ${res.status}`);
@@ -85,6 +122,13 @@ async function main() {
     await scrapeReservoirs(dataDir, scrapedAt);
   } catch (err) {
     console.error("Reservoir scrape failed:", err);
+  }
+
+  // Independent of the other sources, like the reservoir scrape above.
+  try {
+    await scrapeDamsHourly(dataDir, scrapedAt);
+  } catch (err) {
+    console.error("Hourly dam scrape failed:", err);
   }
 
   for (const { id, file } of STATIONS) {

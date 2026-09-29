@@ -6,8 +6,11 @@
   // A reading older than the station's own reporting cadence (plus slack) is
   // flagged, not hidden. Cadence differs per gauge, so it is per-station.
 
-  // Upstream first, so the two cards read top-to-bottom as the river flows.
+  // Upstream first, so the cards read top-to-bottom as the water flows down to the user.
+  // Hourly gauges report about hourly (90 min slack); โพธาราม about every 10 min.
   const STATIONS = [
+    { file: "data/pak-saeng.json", name: "บ้านปากแซง (แควน้อย, อ.ไทรโยค)", role: "ต้นน้ำไกล", staleMinutes: 90 },
+    { file: "data/wang-khanai.json", name: "บ้านวังขนาย (แม่กลอง, อ.ท่าม่วง)", role: "ใกล้ท้ายเขื่อนแม่กลอง", staleMinutes: 90 },
     { file: "data/khai-luang.json", name: "สะพานค่ายหลวง (อ.บ้านโป่ง)", role: "ต้นน้ำ", staleMinutes: 90 },
     { file: "data/photharam.json", name: "โพธาราม (เจ็ดเสมียน, อ.โพธาราม)", role: "ปลายน้ำ", staleMinutes: 30 },
   ];
@@ -52,11 +55,13 @@
   };
 
   // Upstream context, not a river reading: rendered in its own section.
-  // EGAT's daily report: freshness is judged from the report's own as-of time
+  // Each dam has two sources: ThaiWater's hourly feed (headline release, own
+  // timestamp, 3 h slack) and EGAT's daily report (storage %). Freshness of each is
+  // judged from its OWN as-of time, never from scrapedAt. Freshness for EGAT is judged from the report's own as-of time
   // (reportedAt), with a day and a half of slack before flagging it.
   const RESERVOIRS = [
-    { file: "data/reservoir-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: 36 * 60 },
-    { file: "data/reservoir-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: 36 * 60 },
+    { file: "data/reservoir-vajiralongkorn.json", hourlyFile: "data/dam-hourly-vajiralongkorn.json", name: "เขื่อนวชิราลงกรณ", staleMinutes: 36 * 60 },
+    { file: "data/reservoir-srinakarin.json", hourlyFile: "data/dam-hourly-srinakarin.json", name: "เขื่อนศรีนครินทร์", staleMinutes: 36 * 60 },
   ];
 
   function renderChart(history, key = "levelMsl") {
@@ -119,10 +124,47 @@
     return card;
   }
 
-  async function loadReservoir({ file, name, staleMinutes }) {
+  const HOURLY_STALE_MINUTES = 180;
+
+  async function fetchHistory(file) {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`${file} -> HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // The hourly feed is an extra: if it fails, the card still shows EGAT's data.
+  async function fetchHourlyHistory(file) {
+    try {
+      return await fetchHistory(file);
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function renderHourlyRelease(hourly) {
+    const latest = hourly[hourly.length - 1];
+    if (!latest || latest.releaseMcm == null) {
+      return `<div class="reservoir-stats"><div><span class="stat-label">อัตราระบายรายชั่วโมง</span> ไม่มีข้อมูล</div></div>`;
+    }
+    const mins = ageMinutes(latest.reportedAt);
+    const stale = !(mins <= HOURLY_STALE_MINUTES);
+    const asOf = latest.reportedAt ? formatReportTime(latest.reportedAt) : null;
+    const meta = asOf
+      ? `ThaiWater (รายชั่วโมง) ณ ${asOf} (ผ่านมา ${formatDuration(mins)})${stale ? " — ข้อมูลเก่า อาจไม่ล่าสุด" : ""}`
+      : "ไม่ทราบเวลาของข้อมูล — อย่าใช้เป็นข้อมูลล่าสุด";
+    return `<div class="reservoir-stats">
+        <div><span class="stat-label">อัตราระบาย (ล่าสุด)</span> ≈ ${latest.releaseM3s} <span class="unit">ลบ.ม./วินาที</span>
+          <span class="unit">(${latest.releaseMcm.toFixed(2)} ล้าน ลบ.ม./ชม.)</span></div>
+      </div>
+      <div class="station-meta" data-stale="${stale}">${meta}</div>
+      ${renderChart(hourly, "releaseM3s")}`;
+  }
+
+  async function loadReservoir({ file, hourlyFile, name, staleMinutes }) {
     const res = await fetch(file, { cache: "no-store" });
     if (!res.ok) throw new Error(`${file} -> HTTP ${res.status}`);
     const history = await res.json();
+    const hourly = await fetchHourlyHistory(hourlyFile);
     const latest = history[history.length - 1];
 
     const card = document.createElement("div");
@@ -146,10 +188,11 @@
 
     card.innerHTML = `
       <div class="station-header"><span class="station-name">${name}</span></div>
+      ${renderHourlyRelease(hourly)}
       <div class="station-level">${fmt(latest.storagePercent, 2)} <span class="unit">% ของความจุ</span></div>
       <div class="reservoir-stats">
         <div><span class="stat-label">ระดับน้ำ</span> ${fmt(latest.levelMsl, 2)} <span class="unit">ม.รทก.</span></div>
-        <div><span class="stat-label">อัตราระบาย</span> ${fmt(latest.releaseRateM3s, 2)} <span class="unit">ลบ.ม./วินาที</span></div>
+        <div><span class="stat-label">อัตราระบายเฉลี่ยรายวัน (กฟผ.)</span> ${fmt(latest.releaseRateM3s, 2)} <span class="unit">ลบ.ม./วินาที</span></div>
       </div>
       <div class="station-meta" data-stale="${stale}">${metaText}</div>
       ${renderChart(history, "storagePercent")}

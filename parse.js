@@ -103,6 +103,39 @@ function parseReservoirReportDate(raw) {
   );
 }
 
+const numOrNull = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+
+// One `dam_hourly` record from ThaiWater's dam feed. Inflow/release are million
+// m3 over the hour ending at `dam_date` (unit high confidence, per-hour basis
+// medium — see .scratch/maeklong-photharam-water-monitor/research/thaiwater-dam-feed-units.md),
+// so m3/s is MCM * 1e6 / 3600. Unlike EGAT's daily table this has its own
+// hourly timestamp. A missing value stays null — never 0.
+function parseDamHourlyRecord(raw) {
+  const dam = raw.dam || {};
+  const releaseMcm = numOrNull(raw.dam_released);
+  return {
+    damId: dam.id,
+    name: (dam.dam_name && dam.dam_name.th) || null,
+    levelMsl: numOrNull(raw.dam_level),
+    storageMcm: numOrNull(raw.dam_storage),
+    inflowMcm: numOrNull(raw.dam_inflow),
+    releaseMcm,
+    releaseM3s: releaseMcm == null ? null : Math.round((releaseMcm * 1e6) / 3600),
+    reportedAt: toIsoBangkok(raw.dam_date),
+  };
+}
+
+// The feed holds stale rows for some dams alongside current ones, so pick the
+// newest record for the given dam id rather than the first match.
+function pickLatestDamHourly(records, damId) {
+  let best = null;
+  for (const r of records) {
+    if (!r.dam || r.dam.id !== damId) continue;
+    if (!best || String(r.dam_date) > String(best.dam_date)) best = r;
+  }
+  return best;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate };
+  module.exports = { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -93,6 +93,54 @@ test("deriveStatus bands a level at/above warning but below critical as yellow",
 test("deriveStatus bands a level at/above critical as red", () => {
   assert.equal(deriveStatus(7.2, { warningM: 6.5, criticalM: 7.2 }), "red");
   assert.equal(deriveStatus(8, { warningM: 6.5, criticalM: 7.2 }), "red");
+});
+
+// Real records from ThaiWater's dam feed (api-v3 .../analyst/dam, `dam_hourly`),
+// captured 2026-09-29, trimmed to the fields parseDamHourlyRecord reads. Per the
+// units research (.scratch/.../research/thaiwater-dam-feed-units.md), inflow and
+// released are million m3 over the hour ending at dam_date (unit high confidence,
+// per-hour basis medium), storage is million m3 stock.
+const RAW_DAM_VAJIRALONGKORN = {
+  dam_date: "2026-09-29 12:00",
+  dam_storage: 8625.26,
+  dam_inflow: 5.12,
+  dam_level: 154.39,
+  dam_released: 1.24,
+  dam: { id: 56, dam_name: { th: "วชิราลงกรณ" } },
+};
+
+test("parseDamHourlyRecord extracts level, storage, inflow, release and the source's own timestamp", () => {
+  const parsed = parseDamHourlyRecord(RAW_DAM_VAJIRALONGKORN);
+  assert.equal(parsed.damId, 56);
+  assert.equal(parsed.name, "วชิราลงกรณ");
+  assert.equal(parsed.levelMsl, 154.39);
+  assert.equal(parsed.storageMcm, 8625.26);
+  assert.equal(parsed.inflowMcm, 5.12);
+  assert.equal(parsed.releaseMcm, 1.24);
+  assert.equal(parsed.reportedAt, "2026-09-29T12:00:00+07:00");
+});
+
+test("parseDamHourlyRecord converts the hourly release (million m3/h) to m3/s: 1.24 -> 344", () => {
+  // 1.24 * 1,000,000 / 3600 = 344.4 m3/s, rounded to a whole number.
+  assert.equal(parseDamHourlyRecord(RAW_DAM_VAJIRALONGKORN).releaseM3s, 344);
+  assert.equal(parseDamHourlyRecord({ ...RAW_DAM_VAJIRALONGKORN, dam_released: 0 }).releaseM3s, 0);
+});
+
+test("parseDamHourlyRecord yields null, never 0, when the source omits a value", () => {
+  const parsed = parseDamHourlyRecord({ ...RAW_DAM_VAJIRALONGKORN, dam_released: null });
+  assert.equal(parsed.releaseMcm, null);
+  assert.equal(parsed.releaseM3s, null);
+});
+
+test("pickLatestDamHourly returns the newest record for the dam, ignoring other dams and stale duplicates", () => {
+  const records = [
+    { ...RAW_DAM_VAJIRALONGKORN, dam_date: "2021-04-29 14:00", dam_released: 9 },
+    RAW_DAM_VAJIRALONGKORN,
+    { ...RAW_DAM_VAJIRALONGKORN, dam: { id: 54, dam_name: { th: "ศรีนครินทร์" } }, dam_released: 0 },
+  ];
+  const picked = pickLatestDamHourly(records, 56);
+  assert.equal(picked.dam_released, 1.24);
+  assert.equal(pickLatestDamHourly(records, 999), null);
 });
 
 // Real capture of https://water.egat.co.th/water_crisis.php (28 ก.ย. 2569).
