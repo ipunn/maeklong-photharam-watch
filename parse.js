@@ -43,6 +43,42 @@ function deriveStatus(levelMsl, thresholds) {
   return "red";
 }
 
+// EGAT's water_crisis.php is one big server-rendered table, one <tr> per dam.
+// Tracked dams are matched by their Thai name (never by row position — the
+// page's row order and the other dams' rows are not ours to depend on).
+const TRACKED_RESERVOIRS = ["วชิราลงกรณ", "ศรีนครินทร์"];
+// Column offsets among the cells after the name cell.
+const RESERVOIR_COL = { levelMsl: 0, storagePercent: 2, releaseMcmPerDay: 10 };
+
+function cellNumber(text) {
+  const n = Number(text.replace(/,/g, ""));
+  return text !== "" && Number.isFinite(n) ? n : null;
+}
+
+// `raw` is the page's HTML. Returns one record per tracked dam found; a dam
+// with no row is omitted (the caller decides how to report the gap). The page
+// reports release in MCM/day; it is converted here to m3/s (2 dp) so the whole
+// UI uses one unit. The page has no per-row timestamp — that is the scraper's.
+function parseReservoirRecord(raw) {
+  const records = [];
+  for (const [, rowHtml] of String(raw).matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(([, c]) =>
+      c.replace(/<[^>]*>/g, "").trim(),
+    );
+    const name = cells[0];
+    if (!TRACKED_RESERVOIRS.includes(name)) continue;
+    const values = cells.slice(1).map(cellNumber);
+    const mcmPerDay = values[RESERVOIR_COL.releaseMcmPerDay];
+    records.push({
+      name,
+      storagePercent: values[RESERVOIR_COL.storagePercent] ?? null,
+      levelMsl: values[RESERVOIR_COL.levelMsl] ?? null,
+      releaseRateM3s: mcmPerDay == null ? null : Math.round(((mcmPerDay * 1e6) / 86400) * 100) / 100,
+    });
+  }
+  return records;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { parseWaterLevelRecord, deriveStatus, toIsoBangkok };
+  module.exports = { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord };
 }
