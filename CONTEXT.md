@@ -24,6 +24,8 @@
 
 **Status** — red/yellow/green severity of a Gauge reading, derived only from thresholds the source publishes. With no published threshold, or no level, status is **neutral** (null). We never guess one. None of the tracked gauges currently has a published threshold, so no gauge is coloured. Bank height may be shown as a fact next to a level; it does not colour anything.
 
+**Site alert** — the Bang Kruai page's own red signal: a Gauge at least 1 m above its bank height (`aboveBankAlert`, margin set by the maintainer). It is display-only: never written to History, never a Status (no source publishes a threshold), and always labelled on the page as this site's own rule, not an official threshold.
+
 **History** — the append-only per-series log under `data/`. A reading identical to the last stored one is not appended again.
 
 **Collector** — the GitHub Actions workflow that scrapes the sources. Each run starts the next one itself (GitHub's `schedule` proved unreliable). It is judged from `data/status.json`, per source, not from the data itself.
