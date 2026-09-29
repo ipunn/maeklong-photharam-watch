@@ -542,7 +542,8 @@
       document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ</div>`;
     });
     renderInto("stations", STATIONS, loadStation, (s) => stationNameHtml(s.name, s.role));
-    renderInto("reservoirs", RESERVOIRS, loadReservoir, (r) => `<span class="station-name">${r.name}</span>`);
+    // Same order as the river line above: แควใหญ่ (ศรีนครินทร์), then แควน้อย (วชิราลงกรณ).
+    renderInto("reservoirs", [RESERVOIRS[1], RESERVOIRS[0]], loadReservoir, (r) => `<span class="station-name">${r.name}</span>`);
   }
 
   main();
