@@ -236,7 +236,9 @@
     const el = document.getElementById("health");
     let status = null;
     try { status = await getJson("data/status.json"); } catch (err) { /* shown as unknown below */ }
-    const h = status && collectorHealth([status.river], Date.now(), COLLECTOR_WARN_MINUTES);
+    // This Site's own stamp, not `river` (Mae Klong's): one Site's gauges vanishing from the feed
+    // must not be hidden by the other's success. Absent until the Collector has run once with it.
+    const h = status && collectorHealth([status.riverBangkruai], Date.now(), COLLECTOR_WARN_MINUTES);
     if (!h || h.status === "unknown") el.innerHTML = `<span class="health-warn">ไม่ทราบสถานะตัวดึงข้อมูลอัตโนมัติ — ${STALE_TEXT}</span>`;
     else if (h.status === "stale") el.innerHTML = `<span class="health-warn">ตัวดึงข้อมูลอัตโนมัติไม่สำเร็จมาแล้ว ${formatDuration(h.ageMinutes)} — ${STALE_TEXT}</span>`;
     else el.textContent = `ตัวดึงข้อมูลอัตโนมัติ: ดึงสำเร็จล่าสุดเมื่อ ${formatDuration(h.ageMinutes)}ที่แล้ว`;

@@ -14,7 +14,7 @@
 
 **Reading** — one value set reported by a source at *its own* time (`updatedAt` for gauges, `reportedAt` for dams), distinct from `scrapedAt` (when we fetched it). Freshness is always judged from the source's own time, never from `scrapedAt`. Any reading older than 6 hours is flagged "ข้อมูลอาจไม่อัพเดทล่าสุด". The one exception is EGAT's daily table, which is stamped as of the previous midnight and is flagged after 36 hours.
 
-**Source** — one of three independent feeds: `river` (ThaiWater `waterlevel_load`), `reservoir` (EGAT's daily HTML table), `damHourly` (ThaiWater `analyst/dam`, hourly). Each can fail without stopping the others. `data/status.json` records when each last *succeeded*.
+**Source** — one of three independent feeds: `river` (ThaiWater `waterlevel_load`), `reservoir` (EGAT's daily HTML table), `damHourly` (ThaiWater `analyst/dam`, hourly). Each can fail without stopping the others. `data/status.json` records when each last *succeeded*. The `river` Source is stamped once per Site (`river` for Mae Klong, `riverBangkruai` for Bang Kruai), so one Site's gauges missing from the feed cannot be hidden by the other's success.
 
 **Release** — water let out of a dam, shown in m³/s. Headline value: ThaiWater's hourly feed (million m³ over the hour, × 1,000,000 ÷ 3,600). EGAT's daily figure (MCM/day) is secondary.
 

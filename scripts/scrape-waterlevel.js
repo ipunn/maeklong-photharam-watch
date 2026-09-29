@@ -121,6 +121,12 @@ const missing = (msg) => Object.assign(new Error(msg), { missing: true });
 // was found, and no item failed.
 const succeeded = (outcomes) => outcomes.includes("found") && !outcomes.includes("failed");
 
+// Each Site is judged on its own gauges, so one Site's gauges vanishing from the feed cannot be
+// hidden by the other's success, and cannot make the other look unhealthy. The Mae Klong Site
+// keeps the original `river` stamp, so its page is unaffected.
+const SITE_STATUS_KEY = { maeklong: "river", bangkruai: "riverBangkruai" };
+
+// One fetch, one stamp per Site: returns { statusKey: succeeded } for every Site.
 async function scrapeRivers(scrapedAt) {
   const raw = await fetchOk(WATERLEVEL_URL, true);
   const records = (raw.waterlevel_data && raw.waterlevel_data.data) || [];
@@ -148,7 +154,12 @@ async function scrapeRivers(scrapedAt) {
       return `${result} level=${parsed.levelMsl} updatedAt=${parsed.updatedAt}`;
     }),
   );
-  return succeeded(outcomes);
+  return Object.fromEntries(
+    Object.entries(SITE_STATUS_KEY).map(([site, key]) => [
+      key,
+      succeeded(outcomes.filter((_, i) => TRACKED_STATIONS[i].site === site)),
+    ]),
+  );
 }
 
 async function scrapeReservoirs(scrapedAt) {
@@ -213,11 +224,16 @@ async function main() {
   let failed = 0;
   for (const [key, scrape] of Object.entries(SOURCES)) {
     try {
-      if (await scrape(scrapedAt)) status[key] = scrapedAt; // last SUCCESS per source
-      else {
-        failed += 1;
-        console.error(`${key}: no usable data this run — its last-success time is not advanced.`);
+      // A scrape returns true/false, or { statusKey: true/false } when it stamps several keys
+      // (the river source stamps one per Site).
+      const result = await scrape(scrapedAt);
+      const stamps = typeof result === "object" ? result : { [key]: result };
+      for (const [stampKey, ok] of Object.entries(stamps)) {
+        if (ok) status[stampKey] = scrapedAt; // last SUCCESS per stamp
+        else console.error(`${stampKey}: no usable data this run — its last-success time is not advanced.`);
       }
+      // The source counts as failed for the run's exit code only if none of its stamps advanced.
+      if (!Object.values(stamps).some(Boolean)) failed += 1;
     } catch (err) {
       failed += 1;
       console.error(`${key}: scrape failed:`, err);
