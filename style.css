@@ -164,11 +164,6 @@ h1 {
   line-height: 1.5;
 }
 
-.flow-summary {
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin: 0 0 12px;
-}
 
 .flow {
   list-style: none;
@@ -747,4 +742,55 @@ h1 {
 .table-note {
   font-size: 0.75rem;
   margin: 0 0 8px;
+}
+
+/* ---- situation card: the user's own area first ---- */
+.here {
+  margin: 0 0 20px;
+}
+
+.here-sub {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+.here-grid {
+  --line: var(--accent);
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 760px) {
+  .here-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.here-grid .flow-node {
+  margin: 0;
+}
+
+.here-grid .flow-node::before {
+  display: none;
+}
+
+.here-grid .flow-body {
+  grid-template-columns: 1fr;
+}
+
+.here-summary {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.here-more {
+  color: var(--text-dim);
+  font-size: 0.8rem;
 }

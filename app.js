@@ -339,13 +339,14 @@
     return `<div class="flow-meta" data-stale="${d.stale}">${age}${warn}</div>`;
   }
 
-  function flowNodeHtml(node, d) {
+  function flowNodeHtml(node, d, roleOverride) {
     if (node.kind === "you") {
       return `<li class="flow-node flow-you"><div class="flow-type">พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
     }
     const type = `<div class="flow-type" data-type="${node.kind}">${TYPE_LABEL[node.kind]}</div>`;
     const st = node.station;
-    const title = node.kind === "dam" ? node.name : `${st.name}${st.role ? ` <span class="flow-role">${st.role}</span>` : ""}`;
+    const role = roleOverride ?? (st && st.role);
+    const title = node.kind === "dam" ? node.name : `${st.name}${role ? ` <span class="flow-role">${role}</span>` : ""}`;
     if (!d) {
       return `<li class="flow-node">${type}<div class="flow-name">${title}</div><div class="flow-meta">ไม่มีข้อมูล</div></li>`;
     }
@@ -411,16 +412,33 @@
       FLOW.filter((n) => n.kind !== "you").map(async (n) => datas.set(n, await nodeData(n).catch(() => null))),
     );
     const items = (nodes) => nodes.map((n) => flowNodeHtml(n, datas.get(n))).join("");
-    const gaugeTrends = FLOW.filter((n) => n.kind === "gauge" && datas.get(n)).map((n) => datas.get(n).trend);
-    const count = (dir) => gaugeTrends.filter((t) => t && t.direction === dir).length;
-    const unknown = gaugeTrends.filter((t) => !t).length;
-    const summary = `จุดวัดระดับน้ำ ${gaugeTrends.length} แห่ง: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}`;
+    // Situation card: what matters most for the user's area first (Photharam, the gauge in
+    // the area, and สะพานค่ายหลวง, the nearest gauge upstream of it), then a plain summary
+    // of the upstream signal. Facts only: counts and figures, no risk verdict.
+    const here = document.getElementById("here");
+    if (here) {
+      const nodeOf = (st) => FLOW.find((n) => n.station === st);
+      const phNode = nodeOf(STATIONS[3]);
+      const bpNode = nodeOf(STATIONS[2]);
+      const upstreamGauges = FLOW.filter((n) => n.kind === "gauge" && n.station !== STATIONS[3] && datas.get(n));
+      const upTrends = upstreamGauges.map((n) => datas.get(n).trend);
+      const count = (dir) => upTrends.filter((t) => t && t.direction === dir).length;
+      const unknown = upTrends.filter((t) => !t).length;
+      const damLines = FLOW.filter((n) => n.kind === "dam" && datas.get(n) && datas.get(n).latest.releaseM3s != null)
+        .map((n) => `${n.name.replace("เขื่อน", "")} ≈ ${datas.get(n).latest.releaseM3s.toLocaleString("en-US")}`);
+      here.innerHTML = `<h2 class="section-title">พื้นที่ของคุณตอนนี้ <span class="here-sub">อ.โพธาราม จ.ราชบุรี</span></h2>
+        <ul class="here-grid">${flowNodeHtml(phNode, datas.get(phNode), "ในพื้นที่ / ท้ายน้ำ")}${flowNodeHtml(bpNode, datas.get(bpNode), "เหนือน้ำใกล้สุด")}</ul>
+        <div class="here-summary">
+          <div><b>สัญญาณจากต้นน้ำ</b> — จุดวัด ${upstreamGauges.length} แห่งเหนือพื้นที่ของคุณ: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}</div>
+          ${damLines.length ? `<div>เขื่อนระบายน้ำ (ลบ.ม./วินาที): ${damLines.join(" · ")}</div>` : ""}
+          <div class="here-more">รายละเอียดต้นน้ำและเขื่อนอยู่ด้านล่าง</div>
+        </div>`;
+    }
     // One continuous line per river: each branch's line runs down into the merge point,
     // and the Mae Klong line continues from it — so nothing looks disconnected.
     const branch = (b, i) => `<div class="branch" data-branch="${i}"><div class="branch-title">${b.title}</div>
         <ol class="flow">${items(b.nodes)}</ol></div>`;
-    root.innerHTML = `<div class="flow-summary">${summary}</div>
-      <div class="branches">${BRANCHES.map(branch).join("")}</div>
+    root.innerHTML = `<div class="branches">${BRANCHES.map(branch).join("")}</div>
       ${MERGE_DIAGRAM}
       <ol class="flow flow-main"><li class="flow-merge">${MERGE_TEXT}</li>${items(MAIN)}</ol>`;
   }
