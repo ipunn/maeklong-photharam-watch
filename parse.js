@@ -279,6 +279,25 @@ function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
   };
 }
 
+// What the tide hides and a flood shows: the latest FULL Bangkok day's tidal range, and how its
+// high and low moved against the day before (a tide swing cancels out; a real rise lifts both).
+// The change is null unless the previous entry is exactly the day before. Null with no full day.
+function tideTrend(days) {
+  const full = days.filter((d) => !d.partial);
+  if (!full.length) return null;
+  const last = full[full.length - 1];
+  const prev = full[full.length - 2];
+  const dayBefore = new Date(new Date(`${last.date}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10);
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const adjacent = prev && prev.date === dayBefore;
+  return {
+    date: last.date,
+    rangeM: round2(last.high - last.low),
+    highDeltaM: adjacent ? round2(last.high - prev.high) : null,
+    lowDeltaM: adjacent ? round2(last.low - prev.low) : null,
+  };
+}
+
 // A Site is a watched place with its own gauges and page (see CONTEXT.md). Every tracked
 // river gauge belongs to exactly one Site; the Collector serves them all in one run.
 const SITES = ["maeklong", "bangkruai"];
@@ -307,5 +326,5 @@ function stationsForSite(site) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

@@ -28,7 +28,7 @@
     { id: 26 },
     {
       you: true,
-      text: "พื้นที่ของคุณ อยู่ริมคลองบางค้อ (ไม่มีจุดวัด) ที่ บางกรวย นนทบุรี ตามตำแหน่งอยู่ระหว่างปากเกร็ดกับสามเสน คลองในพื้นที่ต่อกับเจ้าพระยาทั้งด้านเหนือน้ำ (คลองบางกรวย) และท้ายน้ำ (คลองอ้อมนนท์ → คลองบางกอกน้อย) จุดวัดใกล้สุดคือคลองมหาสวัสดิ์ (BKK003) ด้านบน (เส้นทางน้ำเป็นการอนุมานจากแผนที่)",
+      text: "พื้นที่ของคุณ อยู่ริมคลองบางค้อ (ไม่มีจุดวัด) ที่ บางกรวย นนทบุรี ซึ่งอยู่ระหว่างปากเกร็ดกับสามเสน คลองในพื้นที่เป็นเครือข่ายที่เปิดสู่เจ้าพระยาทั้งสองด้าน: ด้านเหนือน้ำที่ คลองอ้อมนนท์/คลองลัดบางกรวย (อ.เมืองนนทบุรี–บางกรวย) และด้านท้ายน้ำที่ คลองบางกอกน้อย (เหนือสถานีรถไฟธนบุรี) จุดวัดใกล้สุดคือคลองมหาสวัสดิ์ (BKK003) ด้านบน",
     },
     { id: 2599 },
     { id: 4 },
@@ -64,29 +64,50 @@
   }
 
   // Tidal gauges: the latest two Bangkok days' high and low, one line each.
+  const cm = (m) => `${m > 0 ? "+" : m < 0 ? "−" : "±"}${Math.abs(Math.round(m * 100))} ซม.`;
   function dailyHtml(days) {
     const shown = days.slice(-2).reverse();
     if (!shown.length) return `<div class="flow-meta">รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน</div>`;
-    return shown
+    // The tide swings the level twice a day, so also show what it cannot explain: the tidal
+    // range of the last full day and whether that day's high and low moved against the day before.
+    const t = tideTrend(days);
+    const trend = t
+      ? `<div class="flow-meta">วันที่ ${dayLabel(t.date)} ช่วงน้ำขึ้น–ลง ${t.rangeM.toFixed(2)} ม.${
+          t.highDeltaM == null ? " · ยังเทียบกับวันก่อนหน้าไม่ได้" : ` · เทียบวันก่อน: สูงสุด <b>${cm(t.highDeltaM)}</b> ต่ำสุด <b>${cm(t.lowDeltaM)}</b>`
+        }</div>`
+      : "";
+    return trend + shown
       .map(
         (d) => `<div class="flow-meta">${dayLabel(d.date)}${d.partial ? " (ยังไม่ครบวัน)" : ""}: สูงสุด <b>${d.high.toFixed(2)}</b> ${clock(d.highAt)} · ต่ำสุด <b>${d.low.toFixed(2)}</b> ${clock(d.lowAt)}</div>`,
       )
       .join("");
   }
 
-  function chartHtml(recent) {
-    const pts = recent.map((p) => ({ t: new Date(p.t).getTime(), v: p.v }));
-    if (pts.length < 2) return `<div class="spark"><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
-    const w = 300, h = 56, pad = 6;
-    const t0 = pts[0].t, tN = pts[pts.length - 1].t;
+  // Same chart as the Mae Klong page: a 6 h window, one shared right edge (the newest data
+  // hour across all gauges) so the same x means the same clock time in every box, and an
+  // hourly ticker. A gauge whose newest reading is older stops short of the edge.
+  const CHART_WINDOW_H = 6;
+  const HOUR = 3600000;
+  function chartHtml(recent, endT) {
+    const startT = endT - CHART_WINDOW_H * HOUR;
+    const pts = recent.map((p) => ({ t: new Date(p.t).getTime(), v: p.v })).filter((p) => p.t >= startT && p.t <= endT);
+    if (!pts.length) return `<div class="spark"><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
+    const w = 300, h = 56, pad = 6, minRange = 0.1;
     let min = Math.min(...pts.map((p) => p.v)), max = Math.max(...pts.map((p) => p.v));
-    if (max - min < 0.2) { const mid = (min + max) / 2; min = mid - 0.1; max = mid + 0.1; }
-    const xy = pts.map((p) => [pad + ((p.t - t0) / (tN - t0)) * (w - pad * 2), h - pad - ((p.v - min) / (max - min)) * (h - pad * 2)]);
+    if (max - min < minRange) { const mid = (min + max) / 2; min = mid - minRange / 2; max = mid + minRange / 2; }
+    const xy = pts.map((p) => [pad + ((p.t - startT) / (endT - startT)) * (w - pad * 2), h - pad - ((p.v - min) / (max - min)) * (h - pad * 2)]);
     const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
     const [ex, ey] = xy[xy.length - 1];
+    const ticks = [];
+    for (let t = Math.ceil(startT / HOUR) * HOUR; t <= endT; t += HOUR) {
+      ticks.push({ x: pad + ((t - startT) / (endT - startT)) * (w - pad * 2), hour: (Math.floor(t / HOUR) + 7) % 24 }); // Bangkok = UTC+7
+    }
+    const grid = ticks.map((k) => `<line class="spark-grid" x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
+    const axis = `<div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${ticks
+      .map((k) => `<span class="tick" style="left:${((k.x / w) * 100).toFixed(2)}%">${String(k.hour).padStart(2, "0")}:00</span>`)
+      .join("")}</div>`;
     return `<div class="spark">
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="ระดับผิวน้ำ ${((tN - t0) / 3600000).toFixed(0)} ชั่วโมงที่ผ่านมา"><polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" /></svg>
-      <div class="spark-cap">${((tN - t0) / 3600000).toFixed(0)} ชม.ที่ผ่านมา: ${pts[0].v.toFixed(2)} → ${pts[pts.length - 1].v.toFixed(2)} ม.</div></div>`;
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="ระดับผิวน้ำ ${CHART_WINDOW_H} ชั่วโมงที่ผ่านมา">${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" /></svg>${axis}</div>`;
   }
 
   function trendHtml(recent) {
@@ -98,6 +119,7 @@
 
   // One node in the same markup as the Mae Klong river line / watched-area card.
   function nodeHtml(station, d, roleOverride) {
+    const axisEndT = state.axisEndT;
     const label = LABELS[station.id];
     const type = `<div class="flow-type" data-type="gauge">${label.type}</div>`;
     const title = `${label.name} <span class="flow-role">${label.code} · ${roleOverride || label.role}</span>`;
@@ -119,8 +141,10 @@
       ${discharge}
       ${station.tidal ? dailyHtml(d.summary.days) : trendHtml(d.summary.recent)}
       <div class="flow-meta" data-stale="${stale}">ข้อมูล ${clock(latest.updatedAt)} · ${formatDuration(mins)}ที่แล้ว${stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div></div>
-      <div class="flow-sparks">${chartHtml(d.summary.recent)}</div></div></li>`;
+      <div class="flow-sparks">${chartHtml(d.summary.recent, axisEndT)}</div></div></li>`;
   }
+
+  const state = { axisEndT: 0 };
 
   async function render() {
     const stations = new Map(stationsForSite("bangkruai").map((s) => [s.id, s]));
@@ -130,6 +154,13 @@
         data.set(s.id, { summary: await getJson("data/" + s.summary).catch(() => ({ latest: null, days: [], recent: [] })) }),
       ),
     );
+
+    let newest = 0;
+    for (const { summary } of data.values()) {
+      const r = summary.recent[summary.recent.length - 1];
+      if (r) newest = Math.max(newest, new Date(r.t).getTime());
+    }
+    state.axisEndT = Math.ceil(newest / HOUR) * HOUR;
 
     const hereStation = stations.get(HERE_ID);
     const chaoPhraya = [2744, 26, 2599, 4].map((id) => ({ s: stations.get(id), d: data.get(id) }));

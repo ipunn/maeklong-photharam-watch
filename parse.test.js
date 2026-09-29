@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -489,4 +489,21 @@ test("Bang Kruai Site gauges: exactly its five, tidal set in config, none shared
   const mk = new Set(stationsForSite("maeklong").map((s) => s.id));
   assert.ok(bk.every((s) => !mk.has(s.id)));
   assert.equal(TRACKED_STATIONS.length, bk.length + mk.size);
+});
+
+const D = (date, high, low, partial = false) => ({ date, high, highAt: null, low, lowAt: null, partial });
+
+test("tideTrend gives the latest full day's range and its high/low change against the day before", () => {
+  const t = tideTrend([D("2026-09-27", 2.0, 0.9), D("2026-09-28", 2.3, 1.0), D("2026-09-29", 2.4, 1.1, true)]);
+  assert.deepEqual(t, { date: "2026-09-28", rangeM: 1.3, highDeltaM: 0.3, lowDeltaM: 0.1 });
+});
+
+test("tideTrend gives no change when the previous day is missing or not the day before — never compares across a gap", () => {
+  assert.deepEqual(tideTrend([D("2026-09-28", 2.3, 1.0)]), { date: "2026-09-28", rangeM: 1.3, highDeltaM: null, lowDeltaM: null });
+  assert.equal(tideTrend([D("2026-09-25", 2, 1), D("2026-09-28", 2.3, 1.0)]).highDeltaM, null);
+});
+
+test("tideTrend is null with no full day yet", () => {
+  assert.equal(tideTrend([]), null);
+  assert.equal(tideTrend([D("2026-09-29", 2.4, 1.1, true)]), null);
 });
