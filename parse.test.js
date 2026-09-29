@@ -203,15 +203,23 @@ test("trendOf reports a rise with its real time span and change", () => {
   assert.equal(t.spanHours, 3);
 });
 
+test("trendOf uses the same window for every series: nearest reading to the window start, else null", () => {
+  // Only 1 h back is outside the ±1 h tolerance of a 3 h window -> no box-specific shorter span.
+  assert.equal(trendOf([row("11:00", 1), row("12:00", 2)], "levelMsl", "updatedAt", 3, 0.02), null);
+  // 09:10 is 10 min off the 09:00 window start and nearer than 08:40, so it is the reference.
+  const t = trendOf([row("08:40", 1), row("09:10", 1.5), row("12:00", 2)], "levelMsl", "updatedAt", 3, 0.02);
+  assert.equal(Number(t.spanHours.toFixed(2)), 2.83);
+});
+
 test("trendOf only looks back as far as the window and calls a tiny change steady", () => {
-  const rows = [row("06:00", 10), row("11:00", 17.60), row("12:00", 17.61)];
+  const rows = [row("06:00", 10), row("09:00", 17.60), row("12:00", 17.61)];
   const t = trendOf(rows, "levelMsl", "updatedAt", 3, 0.02);
   assert.equal(t.direction, "steady");
-  assert.equal(t.spanHours, 1);
+  assert.equal(t.spanHours, 3);
 });
 
 test("trendOf reports a fall", () => {
-  const t = trendOf([row("10:00", 54.65), row("12:00", 54.55)], "levelMsl", "updatedAt", 3, 0.02);
+  const t = trendOf([row("09:00", 54.65), row("12:00", 54.55)], "levelMsl", "updatedAt", 3, 0.02);
   assert.equal(t.direction, "falling");
 });
 
@@ -275,14 +283,14 @@ test("seriesOf keeps one point per source timestamp, sorted, dropping non-numeri
 // but the latest step is DOWN 1 cm. trendOf exposes that last step so the UI can say so.
 test("trendOf reports the latest step separately, so a late dip is not hidden by the net rise", () => {
   const rows = [row("12:40", 4.96), row("12:50", 4.98), row("13:00", 4.99), row("13:30", 5.0), row("13:40", 4.99)];
-  const t = trendOf(rows, "levelMsl", "updatedAt", 3, 0.02);
+  const t = trendOf(rows, "levelMsl", "updatedAt", 1, 0.02);
   assert.equal(t.direction, "rising");
   assert.equal(Number((t.delta * 100).toFixed(0)), 3);
   assert.equal(Number((t.lastDelta * 100).toFixed(0)), -1);
 });
 
 test("trendOf lastDelta follows the newest two distinct readings", () => {
-  const t = trendOf([row("10:00", 1), row("11:00", 2), row("12:00", 4)], "levelMsl", "updatedAt", 3, 0.02);
+  const t = trendOf([row("09:00", 1), row("11:00", 2), row("12:00", 4)], "levelMsl", "updatedAt", 3, 0.02);
   assert.equal(t.lastDelta, 2);
 });
 

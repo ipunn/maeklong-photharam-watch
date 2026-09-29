@@ -246,7 +246,7 @@
   function trendHtml(t, kind) {
     if (!t) return `<span class="trend" data-dir="none">ยังไม่มีข้อมูลพอเทียบแนวโน้ม</span>`;
     const [arrow, word] = TREND_TEXT[t.direction];
-    const span = `ใน ${t.spanHours.toFixed(1)} ชม.`;
+    const span = `ราว ${TREND_WINDOW_H} ชม.`;
     if (t.direction === "steady") return `<span class="trend" data-dir="steady">${arrow} ${word} ${span}</span>`;
     // The net change can hide a late reversal, so say so when the newest reading
     // moved against it (by at least the source's own 1 cm resolution).

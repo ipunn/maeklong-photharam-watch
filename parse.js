@@ -214,13 +214,19 @@ function seriesOf(rows, valueKey, timeKey) {
   return [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => ({ t, v }));
 }
 
+const WINDOW_TOLERANCE_MS = 60 * 60000;
+
 function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
   const points = seriesOf(rows, valueKey, timeKey).map((p) => [p.t, p.v]);
   if (points.length < 2) return null;
   const [latestT, latestV] = points[points.length - 1];
   const cutoff = latestT - windowHours * 3600000;
-  const first = points.find(([t]) => t >= cutoff && t < latestT);
-  if (!first) return null;
+  // Every box compares over the same window: the reading nearest to `windowHours`
+  // back, within ±1 h. A shorter/longer span reads as "not enough data" rather
+  // than a differently-sized box that cannot be compared with its neighbours.
+  const candidates = points.filter(([t]) => t < latestT && Math.abs(t - cutoff) <= WINDOW_TOLERANCE_MS);
+  if (!candidates.length) return null;
+  const first = candidates.reduce((a, b) => (Math.abs(b[0] - cutoff) < Math.abs(a[0] - cutoff) ? b : a));
   const delta = latestV - first[1];
   const prevV = points[points.length - 2][1];
   return {
