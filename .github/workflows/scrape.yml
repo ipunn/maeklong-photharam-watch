@@ -1,14 +1,29 @@
 name: Scrape water levels
 
+# How this keeps itself running (GitHub's own `schedule` proved unreliable for this repo:
+# no scheduled run ever started):
+#   - Each run scrapes, commits, waits, then starts the NEXT run of this same workflow with
+#     its built-in token. (workflow_dispatch is one of the events GitHub allows the built-in
+#     token to trigger.) That chain has no dependence on GitHub's scheduler.
+#   - The concurrency group below runs one at a time and keeps only ONE pending run, so
+#     duplicate chains (a manual run, a schedule run) collapse back into a single chain.
+#   - The schedule stays as a second trigger: if it ever fires it can restart a dead chain.
+#   - To stop the chain on purpose: cancel the running workflow run, or disable the workflow.
+#     (The next-run step is skipped when a run is cancelled.)
+
 on:
   schedule:
-    # Off-peak minutes on purpose: GitHub delays or drops scheduled runs at the busiest
-    # minutes (:00, :15, :30, :45). Every 15 minutes, offset by 7.
+    # Off-peak minutes: GitHub delays or drops runs at :00/:15/:30/:45.
     - cron: "7,22,37,52 * * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      wait_minutes:
+        description: "Minutes to wait before starting the next run"
+        default: "13"
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: scrape-waterlevel
@@ -17,7 +32,7 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,3 +52,13 @@ jobs:
             echo "push attempt $attempt failed; retrying"; sleep $((attempt * 5))
           done
           exit 1
+      - name: Start the next run
+        # Runs even if the scrape or commit failed, so one bad run does not break the chain;
+        # skipped when the run is cancelled, which is how to stop it.
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT_MINUTES: ${{ github.event.inputs.wait_minutes || '13' }}
+        run: |
+          sleep "$((WAIT_MINUTES * 60))"
+          gh workflow run scrape.yml --ref main
