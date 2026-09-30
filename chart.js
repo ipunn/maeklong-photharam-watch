@@ -33,7 +33,8 @@
   const dayLabel = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
 
   // opts: { points: [{t, v}], startT, endT, windowH, minRange, digits, unit, ariaLabel,
-  //         references: [{ v, level, name }], referenceProximity, referenceNote, maxStepMs }
+  //         references: [{ v, level, name }], referenceProximity, scaleSteps, referenceNote, maxStepMs }
+  // `scaleSteps`: round the scale up to one of these heights (metres) and print it under the chart.
   // `referenceProximity`: draw a reference only while the readings are within that distance of it.
   // `level` picks the line's colour (CSS: data-level); `name` is its colour in words, so the meaning
   // never rests on colour alone.
@@ -45,6 +46,7 @@
       minRange: opts.minRange,
       references: opts.references || [],
       referenceProximity: opts.referenceProximity ?? null,
+      scaleSteps: opts.scaleSteps || null,
       maxStepMs: opts.maxStepMs,
     });
     if (!m) return "";
@@ -83,6 +85,8 @@
     // A long unit does not fit the margin; those charts carry it in their caption instead.
     const unitLabel = opts.unit && opts.unit.length <= 7 ? `<div class="spark-yunit">${opts.unit}</div>` : "";
 
+    // With stepped scales the height the chart stands for is printed, so steepness is never guessed.
+    const scale = opts.scaleSteps ? `<div class="spark-scale">สเกลกราฟ ${(m.max - m.min).toFixed(2)} ม. (ระหว่างตัวเลขบนสุดและล่างสุด)</div>` : "";
     const cover = m.missingHours >= 1 ? `<div class="spark-cover">ไม่มีข้อมูลในช่วงนี้ ${Math.round(m.missingHours)} ชม.</div>` : "";
     const legend = m.references.length
       ? `<div class="spark-legend">${[...m.references].reverse().map((r) => `<span class="spark-legend-item"><span class="spark-legend-line" data-level="${r.level || ""}"></span>${num(r.v)}${r.name ? ` ${r.name}` : ""}</span>`).join(" ")}${opts.unit ? ` ${opts.unit}` : ""}${opts.referenceNote ? ` · ${opts.referenceNote}` : ""}</div>`
@@ -94,7 +98,7 @@
           ${yLabels}${gapLabels}
         </div>
         <div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${unitLabel}${tickLabels}</div>
-      </div>${cover}${legend}`;
+      </div>${cover}${scale}${legend}`;
   }
 
   window.renderChart = renderChart;

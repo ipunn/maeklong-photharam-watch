@@ -422,15 +422,19 @@ function bangkokDate(ms, daysAgo) {
 // { t: ms, v } and only those inside the Window count. The vertical scale is the data's own min and
 // max (labelled by the caller), widened to `minRange` so a 1 cm wiggle does not look like a collapse,
 // and widened again to include every `references[].v` (levels the page marks) so the distance to
-// them shows (optionally only the ones near the readings, see `referenceProximity`). Extra keys on a
+// them shows (optionally only the ones near the readings, see `referenceProximity`). With `scaleSteps`
+// (an ascending list, in the value's unit) the scale is rounded up to one of those steps instead of
+// being exactly the data's range; `minRange` can still hold several charts to one larger scale. Extra keys on a
 // reference (a name, a colour key) are passed through untouched.
 // A stretch longer than `maxStepMs` between readings is a GAP: the line breaks there instead of a
 // straight line crossing hours nobody measured, and the gap is reported (leading, internal or trailing).
 // Null when no point is in the Window.
 const CHART_PAD_Y = 0.1;
+// Steps (metres) for a level chart's scale: 0.25 to 5 m, fine enough that the data fills over half of it.
+const LEVEL_SCALE_STEPS_M = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 5];
 const CHART_SAME_LEVEL_Y = 0.03; // two levels closer than this (as a fraction of the plot height) are the same line
 
-function chartModel(points, { startT, endT, minRange = 0, references = [], referenceProximity = null, maxStepMs = 2 * 3600000 }) {
+function chartModel(points, { startT, endT, minRange = 0, scaleSteps = null, references = [], referenceProximity = null, maxStepMs = 2 * 3600000 }) {
   if (!(endT > startT)) return null; // an axis that does not run forward has nothing to draw
   const pts = points
     .filter((p) => p.t >= startT && p.t <= endT && Number.isFinite(p.v))
@@ -449,7 +453,13 @@ function chartModel(points, { startT, endT, minRange = 0, references = [], refer
 
   let min = Math.min(...pts.map((p) => p.v), ...refVals);
   let max = Math.max(...pts.map((p) => p.v), ...refVals);
-  const range = Math.max(minRange, 1e-6); // never zero: a flat line must not divide by zero
+  let range = Math.max(minRange, 1e-6); // never zero: a flat line must not divide by zero
+  if (scaleSteps) {
+    // The scale is the smallest step that holds the data (and the reference lines drawn), centred on
+    // it: charts that land in the same step compare directly, and the data fills over half of it.
+    const fit = scaleSteps.find((step) => step >= max - min - 1e-9);
+    if (fit) range = Math.max(range, fit);
+  }
   if (max - min < range) {
     const mid = (min + max) / 2;
     min = mid - range / 2;
@@ -564,5 +574,5 @@ function parseEgatChannelCapacity(html) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

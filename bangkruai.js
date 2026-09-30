@@ -118,7 +118,7 @@
   const HOUR = 3600000;
   function chartHtml(recent, endT) {
     const points = recent.map((p) => ({ t: new Date(p.t).getTime(), v: p.v }));
-    const chart = renderChart({ points, startT: endT - windowH * HOUR, endT, windowH, minRange: 0.1, digits: 2, unit: "ม.รทก.", ariaLabel: `ระดับผิวน้ำ ${windowH} ชั่วโมงที่ผ่านมา` });
+    const chart = renderChart({ points, startT: endT - windowH * HOUR, endT, windowH, minRange: 0.1, scaleSteps: LEVEL_SCALE_STEPS_M, digits: 2, unit: "ม.รทก.", ariaLabel: `ระดับผิวน้ำ ${windowH} ชั่วโมงที่ผ่านมา` });
     return chart ? `<div class="spark">${chart}</div>` : `<div class="spark"><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
   }
 

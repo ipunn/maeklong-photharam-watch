@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -870,4 +870,52 @@ test("chartModel: nothing near means no lines and a scale that is just the data"
 test("chartModel: without a proximity every line is kept, as before", () => {
   const m = chartModel(levelPts([5.55, 5.7, 5.84]), { startT: 1000, endT: 1000 + 3 * 3600000, minRange: 0.1, references: photharamRefs });
   assert.equal(m.references.length, 3);
+});
+
+// ---- stepped vertical scales: the smallest step that fits, so charts in the same step compare directly ----
+const steppedModel = (vals, extra = {}) =>
+  chartModel(levelPts(vals), { startT: 1000, endT: 1000 + vals.length * 3600000, minRange: 0.1, scaleSteps: LEVEL_SCALE_STEPS_M, ...extra });
+const spanOf = (m) => Math.round((m.max - m.min) * 1000) / 1000;
+
+test("chartModel: with steps the scale is the smallest step that fits the data, centred on it", () => {
+  // Today's real 12 h ranges (cm): Photharam 23, K.55A 30, K.11A 62, K.58 112, K.58 over 24 h 266.
+  assert.equal(spanOf(steppedModel([5.61, 5.84])), 0.25);
+  assert.equal(spanOf(steppedModel([10.27, 10.57])), 0.5);
+  assert.equal(spanOf(steppedModel([18.07, 18.69])), 0.75);
+  assert.equal(spanOf(steppedModel([50.63, 51.75])), 1.5);
+  assert.equal(spanOf(steppedModel([48.0, 50.66])), 3);
+  const m = steppedModel([5.61, 5.84]);
+  assert.ok(Math.abs((m.max + m.min) / 2 - (5.61 + 5.84) / 2) < 1e-9); // centred on the data
+});
+
+test("chartModel: the data always fills at least half of the scale it is given", () => {
+  for (const range of [0.1, 0.24, 0.26, 0.49, 0.51, 0.7, 0.76, 1.0, 1.1, 1.6, 2.1, 2.9]) {
+    const m = steppedModel([5, 5 + range]);
+    assert.ok(range / spanOf(m) >= 0.5 - 1e-9 || range < 0.125, `range ${range} fills ${range / spanOf(m)}`);
+  }
+});
+
+test("chartModel: a range beyond the largest step is not cut off", () => {
+  assert.equal(spanOf(steppedModel([0, 7])), 7);
+});
+
+test("chartModel: a larger minRange holds two charts to the same scale (the awareness panel's pair)", () => {
+  const photharam = steppedModel([5.61, 5.84], { minRange: 0.5 });
+  const k55a = steppedModel([10.27, 10.57], { minRange: 0.5 });
+  assert.equal(spanOf(photharam), 0.5);
+  assert.equal(spanOf(k55a), 0.5);
+});
+
+test("chartModel: a reference line the water is near is counted in the step, so it stays on the chart", () => {
+  // Photharam 5.61-5.84 m with the 6.00 line 0.16 above: the data and the line span 0.39 m, so the step is 0.5 m.
+  const m = steppedModel([5.61, 5.84], { references: photharamRefs, referenceProximity: 0.5 });
+  assert.deepEqual(m.references.map((r) => r.level), ["yellow"]);
+  assert.equal(spanOf(m), 0.5);
+  assert.ok(m.references[0].y >= 0.1 - 1e-9 && m.references[0].y <= 0.9 + 1e-9);
+  assert.ok(m.last.y > m.references[0].y);
+});
+
+test("chartModel: without steps the scale is the data's own, as before", () => {
+  const m = chartModel(levelPts([5.61, 5.84]), { startT: 1000, endT: 1000 + 2 * 3600000, minRange: 0.1 });
+  assert.equal(spanOf(m), 0.23);
 });

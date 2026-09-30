@@ -158,7 +158,7 @@
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
       <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
       ${referenceHtml(latest.levelMsl, references, "station-meta")}
-      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, false, references, REFERENCE_PROXIMITY_M)}
+      ${levelChartHtml(history, false, references)}
     `;
     return card;
   }
@@ -348,10 +348,29 @@
     return `<div class="spark"><div class="spark-label">${label}</div><div class="bars" role="img" aria-label="${label}">${cols}</div></div>`;
   }
 
+  // A gauge's level chart: stepped vertical scale (printed under it), Photharam's near reference lines,
+  // and optionally `holdRange`, a scale to hold it to so that two charts side by side compare directly.
+  function levelChartHtml(rows, compact, references, holdRange) {
+    return sparklineHtml(rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, compact, {
+      references, referenceProximity: REFERENCE_PROXIMITY_M, scaleSteps: LEVEL_SCALE_STEPS_M, holdRange,
+    });
+  }
+
+  // The scale a gauge's level chart would take on its own (the reference lines it draws included), in
+  // metres; 0 without data. Used to hold the awareness panel's two charts to the larger of the two.
+  function levelScaleSpan(rows, references) {
+    if (axisEndT == null) return 0;
+    const m = chartModel(seriesOf(rows, "levelMsl", "updatedAt"), {
+      startT: axisEndT - windowH * 3600000, endT: axisEndT, minRange: 0.1, scaleSteps: LEVEL_SCALE_STEPS_M,
+      references: references || [], referenceProximity: REFERENCE_PROXIMITY_M,
+    });
+    return m ? m.max - m.min : 0;
+  }
+
   // Small trend chart for a Window: x is real time, the vertical scale and any gap are drawn by the
   // shared renderer (chart.js). Caption prints the real span and first -> last so it can't overstate.
   // `references` ([{ v, level, name }]) draws a dashed line at each level the page marks (see STATIONS).
-  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false, references = [], referenceProximity = null) {
+  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false, extra = {}) {
     const all = seriesOf(rows, valueKey, timeKey);
     const shared = hourlyAxis && axisEndT != null;
     const latestT = all.length ? all[all.length - 1].t : 0;
@@ -361,7 +380,11 @@
     if (pts.length < (shared ? 1 : 2)) {
       return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
     }
-    const chart = renderChart({ points: all, startT, endT, windowH: windowHours, minRange, digits, unit, ariaLabel: label, references, referenceProximity, referenceNote: REFERENCE_NOTE });
+    const chart = renderChart({
+      points: all, startT, endT, windowH: windowHours, digits, unit, ariaLabel: label, referenceNote: REFERENCE_NOTE,
+      minRange: Math.max(minRange, extra.holdRange || 0), // holdRange keeps charts side by side on one scale
+      references: extra.references || [], referenceProximity: extra.referenceProximity ?? null, scaleSteps: extra.scaleSteps || null,
+    });
     const spanH = (pts[pts.length - 1].t - pts[0].t) / 3600000;
     return `<div class="spark">${compact ? "" : `<div class="spark-label">${label}</div>`}${chart}
       ${compact ? "" : `<div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div>`}</div>`;
@@ -386,7 +409,7 @@
     return `<div class="flow-meta">ความจุลำน้ำตาม กฟผ. ${fmtM3s(c.capacityM3s)} ลบ.ม./วินาที (ณ ${formatShortTime(c.asOf)})${diff}</div>`;
   }
 
-  function flowNodeHtml(node, d, roleOverride) {
+  function flowNodeHtml(node, d, roleOverride, holdRange) {
     if (node.kind === "you") {
       return `<li class="flow-node flow-you"><div class="flow-type">พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
     }
@@ -439,7 +462,7 @@
       ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "gauge")}</div></div>` : ""}
       <div class="flow-group">${freshnessHtml(d)}</div>
       ${remarks.length ? `<div class="flow-remark">${remarks.join("<br>")}</div>` : ""}</div>
-      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, true, node.station && node.station.references, REFERENCE_PROXIMITY_M)}</div></div></li>`;
+      <div class="flow-sparks">${levelChartHtml(d.rows, true, node.station && node.station.references, holdRange)}</div></div></li>`;
   }
 
   async function nodeData(node) {
@@ -510,6 +533,10 @@
       const nodeOf = (st) => FLOW.find((n) => n.station === st);
       const phNode = nodeOf(STATIONS[3]);
       const bpNode = nodeOf(STATIONS[2]);
+      // The two charts side by side in this panel are the ones people compare (is the water upstream
+      // rising, and will Photharam follow?), so they share one scale: the larger of the two.
+      const pd = datas.get(phNode), bd2 = datas.get(bpNode);
+      const pairScale = pd && bd2 ? Math.max(levelScaleSpan(pd.rows, phNode.station.references), levelScaleSpan(bd2.rows, bpNode.station.references)) : 0;
       const upstreamGauges = FLOW.filter((n) => n.kind === "gauge" && n.station !== STATIONS[3] && datas.get(n));
       const upTrends = upstreamGauges.map((n) => datas.get(n).headlineTrend);
       const count = (dir) => upTrends.filter((t) => t && t.direction === dir).length;
@@ -531,7 +558,7 @@
       };
       const flowParts = [flowPart(K37, "บ้านวังเย็น K.37 (เหนือเขื่อนตามระดับน้ำ)"), flowPart(K63, "K.63 (ท้ายเขื่อน ท้ายจุด K.11A)"), flowPart(STATIONS[2], "สะพานค่ายหลวง")].filter(Boolean);
       here.innerHTML = `<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">อ.โพธาราม จ.ราชบุรี</span></h2>
-        <ul class="here-grid">${flowNodeHtml(phNode, datas.get(phNode), "ในพื้นที่ / ท้ายน้ำ")}${flowNodeHtml(bpNode, datas.get(bpNode), "เหนือน้ำใกล้สุด")}</ul>
+        <ul class="here-grid">${flowNodeHtml(phNode, datas.get(phNode), "ในพื้นที่ / ท้ายน้ำ", pairScale)}${flowNodeHtml(bpNode, datas.get(bpNode), "เหนือน้ำใกล้สุด", pairScale)}</ul>
         <div class="here-summary">
           <div><b>สัญญาณจากต้นน้ำ</b> — จุดวัด ${upstreamGauges.length} แห่งเหนือพื้นที่ของคุณ: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}${staleUp ? ` · <span class="health-warn">${STALE_TEXT} ${staleUp} จุด</span>` : ""}</div>
           ${damLines.length ? `<div>เขื่อนระบายน้ำ (ลบ.ม./วินาที): ${damLines.join(" · ")}</div>` : ""}

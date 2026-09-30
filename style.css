@@ -1183,3 +1183,9 @@ h1 {
 .spark-plot[data-tall] svg {
   height: 150px;
 }
+
+/* the height the chart stands for, printed so steepness is never guessed */
+.spark-scale {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
