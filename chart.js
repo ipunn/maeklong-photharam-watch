@@ -33,7 +33,8 @@
   const dayLabel = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
 
   // opts: { points: [{t, v}], startT, endT, windowH, minRange, digits, unit, ariaLabel,
-  //         references: [{ v, level, name }], referenceNote, maxStepMs }
+  //         references: [{ v, level, name }], referenceProximity, referenceNote, maxStepMs }
+  // `referenceProximity`: draw a reference only while the readings are within that distance of it.
   // `level` picks the line's colour (CSS: data-level); `name` is its colour in words, so the meaning
   // never rests on colour alone.
   // Returns "" when nothing falls inside the Window, so the caller can show its own empty message.
@@ -43,6 +44,7 @@
       endT: opts.endT,
       minRange: opts.minRange,
       references: opts.references || [],
+      referenceProximity: opts.referenceProximity ?? null,
       maxStepMs: opts.maxStepMs,
     });
     if (!m) return "";

@@ -840,3 +840,34 @@ test("chartModel: all three reference lines are on the chart at every Window (6,
     assert.ok(m.last.y > m.references[0].y, `${windowH} h: the level is below the lowest line`);
   }
 });
+
+// ---- reference lines that appear only when the water is near them ----
+const photharamRefs = [{ v: 6, level: "yellow" }, { v: 6.5, level: "amber" }, { v: 6.75, level: "red" }];
+const levelPts = (vals) => vals.map((v, i) => ({ t: 1000 + i * 3600000, v }));
+const nearModel = (vals) => chartModel(levelPts(vals), { startT: 1000, endT: 1000 + vals.length * 3600000, minRange: 0.1, references: photharamRefs, referenceProximity: 0.3 });
+
+test("chartModel: with a proximity, only a line the water is near is drawn, and the scale stays tight on the data", () => {
+  // Photharam today: 5.55 -> 5.84 m. 6.00 is 0.16 above the top of the readings; 6.50 and 6.75 are far.
+  const m = nearModel([5.55, 5.7, 5.84]);
+  assert.deepEqual(m.references.map((r) => r.level), ["yellow"]);
+  assert.equal(m.max, 6); // the scale reaches the yellow line and no further
+  assert.equal(m.min, 5.55);
+});
+
+test("chartModel: lines come into view as the water approaches, and stay while it is just past them", () => {
+  assert.deepEqual(nearModel([6.22, 6.26, 6.3]).references.map((r) => r.level), ["yellow", "amber"]); // 0.22 above yellow, 0.20 below amber
+  // readings 6.70-6.90: the red line (6.75) is inside them and the amber (6.50) is 0.20 below; yellow (6.00) is 0.70 away
+  assert.deepEqual(nearModel([6.7, 6.8, 6.9]).references.map((r) => r.level), ["amber", "red"]);
+});
+
+test("chartModel: nothing near means no lines and a scale that is just the data", () => {
+  const m = nearModel([4.0, 4.1, 4.2]);
+  assert.deepEqual(m.references, []);
+  assert.equal(m.max, 4.2);
+  assert.equal(m.min, 4);
+});
+
+test("chartModel: without a proximity every line is kept, as before", () => {
+  const m = chartModel(levelPts([5.55, 5.7, 5.84]), { startT: 1000, endT: 1000 + 3 * 3600000, minRange: 0.1, references: photharamRefs });
+  assert.equal(m.references.length, 3);
+});

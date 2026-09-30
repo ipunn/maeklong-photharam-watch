@@ -422,21 +422,30 @@ function bangkokDate(ms, daysAgo) {
 // { t: ms, v } and only those inside the Window count. The vertical scale is the data's own min and
 // max (labelled by the caller), widened to `minRange` so a 1 cm wiggle does not look like a collapse,
 // and widened again to include every `references[].v` (levels the page marks) so the distance to
-// them shows. Extra keys on a reference (a name, a colour key) are passed through untouched.
+// them shows (optionally only the ones near the readings, see `referenceProximity`). Extra keys on a
+// reference (a name, a colour key) are passed through untouched.
 // A stretch longer than `maxStepMs` between readings is a GAP: the line breaks there instead of a
 // straight line crossing hours nobody measured, and the gap is reported (leading, internal or trailing).
 // Null when no point is in the Window.
 const CHART_PAD_Y = 0.1;
 const CHART_SAME_LEVEL_Y = 0.03; // two levels closer than this (as a fraction of the plot height) are the same line
 
-function chartModel(points, { startT, endT, minRange = 0, references = [], maxStepMs = 2 * 3600000 }) {
+function chartModel(points, { startT, endT, minRange = 0, references = [], referenceProximity = null, maxStepMs = 2 * 3600000 }) {
   if (!(endT > startT)) return null; // an axis that does not run forward has nothing to draw
   const pts = points
     .filter((p) => p.t >= startT && p.t <= endT && Number.isFinite(p.v))
     .sort((a, b) => a.t - b.t);
   if (!pts.length) return null;
   const xOf = (t) => (t - startT) / (endT - startT);
-  const refVals = references.filter((r) => Number.isFinite(r.v)).map((r) => r.v);
+  // With `referenceProximity` (same unit as v) a reference is used only when it lies within that
+  // distance of the readings in the Window (inside their range, or up to that far above or below it):
+  // a line the water is nowhere near takes no space, and comes into view as the water approaches.
+  const dataMin = Math.min(...pts.map((p) => p.v));
+  const dataMax = Math.max(...pts.map((p) => p.v));
+  references = references.filter(
+    (r) => Number.isFinite(r.v) && (referenceProximity === null || (r.v >= dataMin - referenceProximity && r.v <= dataMax + referenceProximity)),
+  );
+  const refVals = references.map((r) => r.v);
 
   let min = Math.min(...pts.map((p) => p.v), ...refVals);
   let max = Math.max(...pts.map((p) => p.v), ...refVals);

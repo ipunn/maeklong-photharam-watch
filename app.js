@@ -12,6 +12,10 @@
   // level), NOT official thresholds and never a Status (Status comes only from source-published
   // thresholds). Always shown with the note below; the colour is also named in words.
   const REFERENCE_NOTE = "เส้นอ้างอิงที่ตั้งไว้ในเว็บนี้ ไม่ใช่เกณฑ์ทางการ";
+  // A reference line is drawn on the chart only while the water is within this distance of it (m), so a
+  // line the water is nowhere near takes no space; it comes into view as the water approaches. The card
+  // text always states the distance to every line. A placeholder for the maintainer to tune.
+  const REFERENCE_PROXIMITY_M = 0.5;
   const PHOTHARAM_REFERENCES = [
     { v: 6, level: "yellow", name: "เส้นเหลือง" },
     { v: 6.5, level: "amber", name: "เส้นส้ม" },
@@ -120,7 +124,7 @@
       })
       .filter(Boolean);
     if (!parts.length) return "";
-    return `<div class="${cls}">ระดับปัจจุบัน ${levelMsl.toFixed(2)} ม.รทก. ${parts.join(" · ")} <span class="unit">(${REFERENCE_NOTE})</span></div>`;
+    return `<div class="${cls}">ระดับปัจจุบัน ${levelMsl.toFixed(2)} ม.รทก. ${parts.join(" · ")} <span class="unit">(${REFERENCE_NOTE} · เส้นจะแสดงบนกราฟเมื่อระดับน้ำห่างไม่เกิน ${REFERENCE_PROXIMITY_M.toFixed(2)} ม.)</span></div>`;
   }
 
   async function loadStation({ file, name, role, staleMinutes, references }) {
@@ -154,7 +158,7 @@
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
       <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
       ${referenceHtml(latest.levelMsl, references, "station-meta")}
-      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, false, references)}
+      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, false, references, REFERENCE_PROXIMITY_M)}
     `;
     return card;
   }
@@ -347,7 +351,7 @@
   // Small trend chart for a Window: x is real time, the vertical scale and any gap are drawn by the
   // shared renderer (chart.js). Caption prints the real span and first -> last so it can't overstate.
   // `references` ([{ v, level, name }]) draws a dashed line at each level the page marks (see STATIONS).
-  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false, references = []) {
+  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false, references = [], referenceProximity = null) {
     const all = seriesOf(rows, valueKey, timeKey);
     const shared = hourlyAxis && axisEndT != null;
     const latestT = all.length ? all[all.length - 1].t : 0;
@@ -357,7 +361,7 @@
     if (pts.length < (shared ? 1 : 2)) {
       return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
     }
-    const chart = renderChart({ points: all, startT, endT, windowH: windowHours, minRange, digits, unit, ariaLabel: label, references, referenceNote: REFERENCE_NOTE });
+    const chart = renderChart({ points: all, startT, endT, windowH: windowHours, minRange, digits, unit, ariaLabel: label, references, referenceProximity, referenceNote: REFERENCE_NOTE });
     const spanH = (pts[pts.length - 1].t - pts[0].t) / 3600000;
     return `<div class="spark">${compact ? "" : `<div class="spark-label">${label}</div>`}${chart}
       ${compact ? "" : `<div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div>`}</div>`;
@@ -435,7 +439,7 @@
       ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "gauge")}</div></div>` : ""}
       <div class="flow-group">${freshnessHtml(d)}</div>
       ${remarks.length ? `<div class="flow-remark">${remarks.join("<br>")}</div>` : ""}</div>
-      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, true, node.station && node.station.references)}</div></div></li>`;
+      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, true, node.station && node.station.references, REFERENCE_PROXIMITY_M)}</div></div></li>`;
   }
 
   async function nodeData(node) {
