@@ -72,6 +72,9 @@
     return new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ms) + " น.";
   }
 
+  // A date-change label on a 24 h axis (Bangkok midnight), e.g. "30 ก.ย."
+  const dayLabel = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
+
   const STATUS_LABEL = {
     red: "วิกฤต",
     yellow: "เฝ้าระวัง",
@@ -126,7 +129,7 @@
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
       <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
-      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, CHART_WINDOW_H, true)}
+      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, windowH, true)}
     `;
     return card;
   }
@@ -158,7 +161,7 @@
           <span class="unit">(${latest.releaseMcm.toFixed(2)} ล้าน ลบ.ม./ชม.)</span></div>
       </div>
       <div class="station-meta" data-stale="${stale}">${meta}</div>
-      ${sparklineHtml(hourly, "releaseM3s", "reportedAt", "อัตราระบาย", "ลบ.ม./วินาที", 0, 50, CHART_WINDOW_H, true)}`;
+      ${sparklineHtml(hourly, "releaseM3s", "reportedAt", "อัตราระบาย", "ลบ.ม./วินาที", 0, 50, windowH, true)}`;
   }
 
   async function loadReservoir({ file, hourlyFile, name, staleMinutes }) {
@@ -205,9 +208,11 @@
   // own timestamps, over the data we really have (the real span is printed). No
   // official thresholds exist for these gauges, so there is deliberately NO danger
   // colour: direction of change only.
-  const TREND_WINDOW_H = 3;
-  const GAUGE_STEADY_M = 0.02; // <= 2 cm over the span reads as "steady"
-  const RELEASE_STEADY_M3S = 10;
+  // The Window (6 / 12 / 24 h, from the toggle) sets every chart and trend. "Steady" is judged
+  // per Window (steadyTolerance in parse.js). The situation card's upstream summary is the one
+  // exception: it always uses HEADLINE_WINDOW_H, so it never changes when the toggle does.
+  let windowH = WindowToggle.current();
+  const HEADLINE_WINDOW_H = 6;
 
   // The two upstream rivers are PARALLEL, not in sequence: they merge at Kanchanaburi
   // into the Mae Klong, so they are drawn as separate branches, then one main line.
@@ -246,14 +251,14 @@
   function trendHtml(t, kind) {
     if (!t) return `<span class="trend" data-dir="none">ยังไม่มีข้อมูลพอเทียบแนวโน้ม</span>`;
     const [arrow, word] = TREND_TEXT[t.direction];
-    const span = `ราว ${TREND_WINDOW_H} ชม.`;
+    const span = `ราว ${windowH} ชม.`;
     if (t.direction === "steady") return `<span class="trend" data-dir="steady">${arrow} ${word} ${span}</span>`;
     // The net change can hide a late reversal, so say so when the newest reading
     // moved against it (by at least the source's own 1 cm resolution).
     const against = t.direction === "rising" ? t.lastDelta < 0 : t.lastDelta > 0;
     const stepArrow = t.lastDelta < 0 ? "▼" : "▲";
     if (kind === "dam") {
-      const note = against && Math.abs(t.lastDelta) >= RELEASE_STEADY_M3S
+      const note = against && Math.abs(t.lastDelta) >= steadyTolerance("release", windowH)
         ? ` <span class="trend-note">· รอบล่าสุด ${stepArrow} ${Math.abs(Math.round(t.lastDelta))} ลบ.ม./วินาที</span>` : "";
       return `<span class="trend" data-dir="${t.direction}">${arrow} อัตราระบาย${word} ${Math.abs(Math.round(t.delta))} ลบ.ม./วินาที ${span}</span>${note}`;
     }
@@ -264,23 +269,9 @@
     return `<span class="trend" data-dir="${t.direction}">${arrow} ${word} ${Math.round(cm)} ซม. ${span} (≈ ${perHour.toFixed(1)} ซม./ชม.)</span>${note}`;
   }
 
-  // The long view for a gauge: net change against ~24 h ago (nearest reading within +-1 h),
-  // so a slow rise or fall is visible beyond the 3 h trend above. Null-safe: no reading that
-  // far back means no claim.
-  const LONG_WINDOW_H = 24;
-  const LONG_STEADY_M = 0.05; // <= 5 cm over a day reads as "steady"
-  function longTrendHtml(t) {
-    if (!t) return ""; // the caller adds a remark: "no data yet" is not a measurement
-    const [arrow, word] = TREND_TEXT[t.direction];
-    const cm = Math.round(Math.abs(t.delta) * 100);
-    const text = t.direction === "steady" ? `${word}` : `${word} ${cm} ซม.`;
-    return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} เทียบ ${LONG_WINDOW_H} ชม.ก่อน: ${text}</span></div>`;
-  }
-
   // Every hourly chart shares ONE time axis: the right edge is the newest data hour across
   // all sources, so the same x position means the same clock time in every box. A series
   // whose newest reading is older simply stops short and is left blank up to the edge.
-  const CHART_WINDOW_H = 6;
   let axisEndT = null;
   async function loadAxisEnd() {
     const files = [
@@ -351,24 +342,22 @@
     const spanH = (pts[pts.length - 1].t - pts[0].t) / 3600000;
     // Hourly ticker: one tick per whole hour (Bangkok is UTC+7, a whole-hour offset).
     // Only for short windows; labels are HTML so the stretched svg cannot distort them.
-    const HOUR = 3600000;
-    const ticks = [];
-    if (hourlyAxis && (tN - t0) / 3600000 <= 24) {
-      for (let t = Math.ceil(t0 / HOUR) * HOUR; t <= tN; t += HOUR) {
-        const frac = (t - t0) / (tN - t0);
-        ticks.push({ x: pad + frac * (w - pad * 2), hour: (Math.floor(t / HOUR) + 7) % 24 });
-      }
-    }
-    const grid = ticks.map((k) => `<line class="spark-grid" x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
+    const ticks = hourlyAxis
+      ? axisTicks(t0, tN, windowHours).map((k) => ({ ...k, x: pad + ((k.t - t0) / (tN - t0)) * (w - pad * 2) }))
+      : [];
+    const grid = ticks.map((k) => `<line class="spark-grid"${k.midnight ? " data-midnight" : ""} x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
     const axis = ticks.length
       ? `<div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${ticks
-          .map((k) => `<span class="tick" style="left:${((k.x / w) * 100).toFixed(2)}%">${String(k.hour).padStart(2, "0")}:00</span>`)
+          .map((k) => `<span class="tick"${k.midnight ? " data-midnight" : ""} style="left:${((k.x / w) * 100).toFixed(2)}%">${k.midnight ? dayLabel(k.t) : `${String(k.hour).padStart(2, "0")}:00`}</span>`)
           .join("")}</div>`
       : "";
+    // Less history than the Window: say how much there is, never redraw to a different size.
+    const haveH = shared ? (endT - all[0].t) / 3600000 : 0;
+    const cover = shared && haveH < windowHours - 0.5 ? `<div class="spark-cover">มีข้อมูลเพียง ${Math.round(haveH)} ชม.</div>` : "";
     return `<div class="spark">${compact ? "" : `<div class="spark-label">${label}</div>`}
       <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${label}">
         ${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" />
-      </svg>${axis}
+      </svg>${axis}${cover}
       ${compact ? "" : `<div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div>`}</div>`;
   }
 
@@ -403,19 +392,18 @@
         <div class="flow-value"><span class="flow-label">ระบายน้ำลงแม่น้ำ</span> ${release}</div>
         ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "dam")}</div></div>` : ""}
         <div class="flow-group">${freshnessHtml(d)}</div>
-        ${d.trend ? "" : `<div class="flow-remark">ยังไม่มีข้อมูลพอเทียบแนวโน้ม</div>`}</div></div></li>`;
+        ${d.trend ? "" : `<div class="flow-remark">ยังไม่มีข้อมูลย้อนหลัง ${windowH} ชม. พอเทียบแนวโน้ม</div>`}</div></div></li>`;
     }
     // "No data yet" messages are remarks in small grey text, apart from the measurements.
     const remarks = [];
-    if (!d.trend) remarks.push("ยังไม่มีข้อมูลพอเทียบแนวโน้ม");
-    if (!d.longTrend) remarks.push(`ยังไม่มีข้อมูลย้อนหลัง ${LONG_WINDOW_H} ชม. พอเทียบ`);
+    if (!d.trend) remarks.push(`ยังไม่มีข้อมูลย้อนหลัง ${windowH} ชม. พอเทียบแนวโน้ม`);
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
-      ${d.trend || d.longTrend ? `<div class="flow-group">${d.trend ? `<div class="flow-meta">${trendHtml(d.trend, "gauge")}</div>` : ""}${longTrendHtml(d.longTrend)}</div>` : ""}
+      ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "gauge")}</div></div>` : ""}
       <div class="flow-group">${freshnessHtml(d)}</div>
       ${remarks.length ? `<div class="flow-remark">${remarks.join("<br>")}</div>` : ""}</div>
-      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, CHART_WINDOW_H, true, true)}</div></div></li>`;
+      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, windowH, true, true)}</div></div></li>`;
   }
 
   async function nodeData(node) {
@@ -431,7 +419,7 @@
       return {
         latest,
         rows,
-        trend: trendOf(rows, "releaseM3s", "reportedAt", TREND_WINDOW_H, RELEASE_STEADY_M3S),
+        trend: trendOf(rows, "releaseM3s", "reportedAt", windowH, steadyTolerance("release", windowH)),
         capacity,
         mins,
         stale: !(mins <= STALE_MINUTES),
@@ -445,20 +433,26 @@
     return {
       latest,
       rows,
-      trend: trendOf(rows, "levelMsl", "updatedAt", TREND_WINDOW_H, GAUGE_STEADY_M),
-      longTrend: trendOf(rows, "levelMsl", "updatedAt", LONG_WINDOW_H, LONG_STEADY_M),
+      trend: trendOf(rows, "levelMsl", "updatedAt", windowH, steadyTolerance("gauge", windowH)),
+      headlineTrend: trendOf(rows, "levelMsl", "updatedAt", HEADLINE_WINDOW_H, steadyTolerance("gauge", HEADLINE_WINDOW_H)),
       mins,
       stale: !(mins <= STALE_MINUTES),
       asOf: latest.updatedAt ? formatShortTime(latest.updatedAt) : null,
     };
   }
 
+  // Bumped on every full redraw (a Window change): a redraw still in flight when the next one
+  // starts must not write into the page afterwards.
+  let renderId = 0;
+
   async function renderFlow() {
+    const myRender = renderId;
     const root = document.getElementById("flow");
     const datas = new Map();
     await Promise.all(
       FLOW.filter((n) => n.kind !== "you").map(async (n) => datas.set(n, await nodeData(n).catch(() => null))),
     );
+    if (myRender !== renderId) return;
     const items = (nodes) => nodes.map((n) => flowNodeHtml(n, datas.get(n))).join("");
     // Situation card: what matters most for the user's area first (Photharam, the gauge in
     // the area, and สะพานค่ายหลวง, the nearest gauge upstream of it), then a plain summary
@@ -469,7 +463,7 @@
       const phNode = nodeOf(STATIONS[3]);
       const bpNode = nodeOf(STATIONS[2]);
       const upstreamGauges = FLOW.filter((n) => n.kind === "gauge" && n.station !== STATIONS[3] && datas.get(n));
-      const upTrends = upstreamGauges.map((n) => datas.get(n).trend);
+      const upTrends = upstreamGauges.map((n) => datas.get(n).headlineTrend);
       const count = (dir) => upTrends.filter((t) => t && t.direction === dir).length;
       const unknown = upTrends.filter((t) => !t).length;
       const staleUp = upstreamGauges.filter((n) => datas.get(n).stale).length;
@@ -541,12 +535,17 @@
   }
 
   async function renderInto(rootId, items, load, nameHtml) {
+    const myRender = renderId;
     const root = document.getElementById(rootId);
     for (const item of items) {
+      if (myRender !== renderId) return;
       try {
-        root.appendChild(await load(item));
+        const card = await load(item);
+        if (myRender !== renderId) return;
+        root.appendChild(card);
       } catch (err) {
         console.error(err);
+        if (myRender !== renderId) return;
         const card = document.createElement("div");
         card.className = "station-card";
         card.innerHTML = `<div class="station-header">${nameHtml(item)}</div>
@@ -556,9 +555,10 @@
     }
   }
 
-  async function main() {
-    loadHealth();
-    await loadAxisEnd();
+  // Draws everything that follows the Window. Cheap to repeat: history files are cached.
+  function renderAll() {
+    renderId++;
+    for (const id of ["flow", "stations", "reservoirs"]) document.getElementById(id).innerHTML = "";
     renderFlow().catch((err) => {
       console.error(err);
       document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ</div>`;
@@ -566,6 +566,17 @@
     renderInto("stations", STATIONS, loadStation, (s) => stationNameHtml(s.name, s.role));
     // Same order as the river line above: แควใหญ่ (ศรีนครินทร์), then แควน้อย (วชิราลงกรณ).
     renderInto("reservoirs", [RESERVOIRS[1], RESERVOIRS[0]], loadReservoir, (r) => `<span class="station-name">${r.name}</span>`);
+  }
+
+  async function main() {
+    loadHealth();
+    await loadAxisEnd();
+    WindowToggle.mount(
+      document.getElementById("window-toggle"),
+      "สรุปด้านบนใช้ 6 ชม. เสมอ · ข้อมูลรายวันของเขื่อนไม่เปลี่ยนตามช่วงเวลา",
+      (h) => { windowH = h; renderAll(); },
+    );
+    renderAll();
   }
 
   main();

@@ -1011,3 +1011,75 @@ h1 {
 .flow-sparks {
   margin-top: 6px;
 }
+
+/* Window toggle: stays in view while scrolling so every box can be compared at one span */
+.window-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.wt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wt-label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.wt-buttons {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card-bg);
+}
+.wt-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.wt-btn:last-child {
+  border-right: 0;
+}
+.wt-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.wt-note {
+  margin: 4px 0 8px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* 24 h axes cross midnight: the date label replaces the clock label and its grid line is firmer */
+.tick[data-midnight] {
+  font-weight: 700;
+  color: var(--text);
+}
+.spark-grid[data-midnight] {
+  stroke: var(--text-dim);
+}
+/* the box has less data than the chosen Window */
+.spark-cover {
+  font-size: 0.75rem;
+  color: var(--stale-text);
+}
+
+/* phones: thumb-sized toggle buttons */
+@media (max-width: 480px) {
+  .wt-btn {
+    min-height: 44px;
+    padding: 0 16px;
+  }
+}

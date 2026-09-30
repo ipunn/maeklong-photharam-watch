@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -540,4 +540,92 @@ test("aboveBankAlert is false — never true — when the level or the bank is m
   assert.equal(aboveBankAlert(null, 2.07, 1), false);
   assert.equal(aboveBankAlert(3.5, null, 1), false);
   assert.equal(aboveBankAlert(NaN, 2, 1), false);
+});
+
+// ---- Window: the one span (6/12/24 h) every hourly chart and trend follows ----
+
+test("resolveWindow: the URL beats the stored choice, which beats the 6 h default", () => {
+  assert.equal(resolveWindow("", null), 6);
+  assert.equal(resolveWindow("", "12"), 12);
+  assert.equal(resolveWindow("?window=24", "12"), 24);
+  assert.equal(resolveWindow("?x=1&window=12", null), 12);
+});
+
+test("resolveWindow: an unsupported or garbled value falls back instead of breaking the page", () => {
+  assert.equal(resolveWindow("?window=48", null), 6);
+  assert.equal(resolveWindow("?window=abc", "24"), 24); // bad URL value: use the stored one
+  assert.equal(resolveWindow("", "7"), 6);
+  assert.equal(resolveWindow(undefined, undefined), 6); // storage blocked or no location
+});
+
+test("steadyTolerance: a longer Window tolerates more drift before it stops reading 'steady'", () => {
+  assert.equal(steadyTolerance("gauge", 6), 0.03);
+  assert.equal(steadyTolerance("gauge", 12), 0.04);
+  assert.equal(steadyTolerance("gauge", 24), 0.05);
+  assert.equal(steadyTolerance("release", 6), 10);
+  assert.ok(steadyTolerance("release", 24) > steadyTolerance("release", 12));
+  assert.ok(steadyTolerance("release", 12) > steadyTolerance("release", 6));
+});
+
+test("steadyTolerance: an unsupported Window falls back to the default's tolerance", () => {
+  assert.equal(steadyTolerance("gauge", 7), steadyTolerance("gauge", 6));
+});
+
+// Bangkok is UTC+7, so 11:00Z is 18:00 in Bangkok and 17:00Z is Bangkok midnight.
+const Z = (iso) => Date.parse(iso);
+
+test("axisTicks: 6 h Window ticks every whole Bangkok hour", () => {
+  const ticks = axisTicks(Z("2026-09-29T05:00:00Z"), Z("2026-09-29T11:00:00Z"), 6);
+  assert.deepEqual(ticks.map((k) => k.hour), [12, 13, 14, 15, 16, 17, 18]);
+  assert.ok(ticks.every((k) => !k.midnight));
+});
+
+test("axisTicks: 12 h Window ticks every 2 h, on even Bangkok hours", () => {
+  const ticks = axisTicks(Z("2026-09-29T04:30:00Z"), Z("2026-09-29T16:30:00Z"), 12);
+  assert.deepEqual(ticks.map((k) => k.hour), [12, 14, 16, 18, 20, 22]);
+});
+
+test("axisTicks: 24 h Window ticks every 4 h and marks Bangkok midnight as the date change", () => {
+  const ticks = axisTicks(Z("2026-09-29T11:00:00Z"), Z("2026-09-30T11:00:00Z"), 24);
+  assert.deepEqual(ticks.map((k) => k.hour), [20, 0, 4, 8, 12, 16]);
+  assert.deepEqual(ticks.filter((k) => k.midnight).map((k) => k.t), [Z("2026-09-29T17:00:00Z")]);
+});
+
+test("axisTicks: a tick on the right edge is kept, and each tick's t lies inside the axis", () => {
+  const t0 = Z("2026-09-29T05:00:00Z");
+  const tN = Z("2026-09-29T17:00:00Z"); // exactly Bangkok midnight
+  const ticks = axisTicks(t0, tN, 12);
+  assert.equal(ticks[ticks.length - 1].hour, 0);
+  assert.ok(ticks[ticks.length - 1].midnight);
+  assert.ok(ticks.every((k) => k.t >= t0 && k.t <= tN));
+});
+
+// trendOf across the Window: hourly readings, level rising 1 cm/h for 30 h, newest 2026-09-30 06:00 (+07:00)
+const hourlyRise = Array.from({ length: 31 }, (_, i) => ({
+  updatedAt: new Date(Date.parse("2026-09-29T00:00:00+07:00") + i * 3600000).toISOString(),
+  levelMsl: 5 + i * 0.01,
+}));
+
+test("trendOf: the same series reads over 6, 12 and 24 h, each with its real span", () => {
+  for (const w of [6, 12, 24]) {
+    const t = trendOf(hourlyRise, "levelMsl", "updatedAt", w, steadyTolerance("gauge", w));
+    assert.equal(t.spanHours, w);
+    assert.equal(t.direction, "rising");
+    assert.ok(Math.abs(t.delta - w * 0.01) < 1e-9);
+  }
+});
+
+test("trendOf: a slow drift is 'steady' over 6 h but 'rising' over 24 h", () => {
+  const slow = Array.from({ length: 25 }, (_, i) => ({
+    updatedAt: new Date(Date.parse("2026-09-29T00:00:00+07:00") + i * 3600000).toISOString(),
+    levelMsl: 5 + i * 0.004, // 0.4 cm/h: 2.4 cm over 6 h, 9.6 cm over 24 h
+  }));
+  assert.equal(trendOf(slow, "levelMsl", "updatedAt", 6, steadyTolerance("gauge", 6)).direction, "steady");
+  assert.equal(trendOf(slow, "levelMsl", "updatedAt", 24, steadyTolerance("gauge", 24)).direction, "rising");
+});
+
+test("trendOf: no claim when history does not reach back the Window", () => {
+  const eleven = hourlyRise.slice(0, 11); // only 10 h of history
+  assert.equal(trendOf(eleven, "levelMsl", "updatedAt", 24, steadyTolerance("gauge", 24)), null);
+  assert.ok(trendOf(eleven, "levelMsl", "updatedAt", 6, steadyTolerance("gauge", 6)));
 });

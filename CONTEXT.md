@@ -6,6 +6,8 @@
 
 **Proxy gauge** — a Gauge that is near a Site but not on the waterway that threatens it. คลองบางค้อ has no gauge of its own, so the Bang Kruai Site shows only proxy gauges (e.g. BKK003 on คลองมหาสวัสดิ์, Chao Phraya gauges), each labelled with its relation to the area, side by side with no headline, under a fixed note that the canal itself is not measured.
 
+**Window** — the span of time, ending at the newest data hour, that every hourly chart and trend line covers: 6, 12 or 24 h, one choice for the whole page, default 6 h. Boxes share the same right edge, so the same x means the same clock time everywhere. A box with less data than the Window shows what it has and says how much that is; it is never redrawn to a different size. Daily boxes (EGAT storage bars, Tide high/low), the headline and the Site alert do not follow the Window.
+
 **Tide** — the twice-daily rise and fall of a tidal Gauge (Chao Phraya and its canals, unlike Mae Klong). A rising/falling trend is not meaningful there; the page shows each day's high and low instead.
 
 **Daily summary** — the small derived file `data/daily-<gauge>.json` per Bang Kruai gauge: each Bangkok day's high and low (tidal gauges; today is marked partial) plus the last 48 h of readings. Derived from History, never a replacement for it.

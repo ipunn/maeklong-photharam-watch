@@ -353,6 +353,49 @@ function stationsForSite(site) {
   return TRACKED_STATIONS.filter((s) => s.site === site);
 }
 
+// The Window: one span, in hours, for every hourly chart and trend on a page. The URL
+// (`?window=12`, so a link can carry a view) beats the stored choice, which beats the default.
+// A value that is not one of WINDOWS_H is ignored, never trusted.
+const WINDOWS_H = [6, 12, 24];
+const DEFAULT_WINDOW_H = 6;
+
+function resolveWindow(search, stored) {
+  const fromUrl = Number(new URLSearchParams(search || "").get("window"));
+  const fromStore = Number(stored);
+  if (WINDOWS_H.includes(fromUrl)) return fromUrl;
+  if (WINDOWS_H.includes(fromStore)) return fromStore;
+  return DEFAULT_WINDOW_H;
+}
+
+// When a trend reads "steady", per Window: a longer span lets a small drift add up, so it
+// tolerates more. Gauge in metres; release in m3/s. PLACEHOLDERS for the maintainer to tune
+// (24 h gauge = the old long-view value; release scaled from the old 10 m3/s at the same ratio).
+const STEADY_TOLERANCE = {
+  gauge: { 6: 0.03, 12: 0.04, 24: 0.05 },
+  release: { 6: 10, 12: 13, 24: 17 },
+};
+
+function steadyTolerance(kind, windowH) {
+  const table = STEADY_TOLERANCE[kind];
+  return table[windowH] ?? table[DEFAULT_WINDOW_H];
+}
+
+// Time-axis ticks for a Window: every 1 / 2 / 4 h for 6 / 12 / 24 h, on whole Bangkok clock
+// hours that are multiples of the step (so every box shares the same ticks). Bangkok is
+// UTC+7, a whole-hour offset. `midnight` marks the date change, which a 24 h axis crosses.
+const TICK_STEP_H = { 6: 1, 12: 2, 24: 4 };
+
+function axisTicks(t0, tN, windowH) {
+  const HOUR = 3600000;
+  const step = TICK_STEP_H[windowH] ?? TICK_STEP_H[DEFAULT_WINDOW_H];
+  const ticks = [];
+  for (let t = Math.ceil(t0 / HOUR) * HOUR; t <= tN; t += HOUR) {
+    const hour = (Math.floor(t / HOUR) + 7) % 24;
+    if (hour % step === 0) ticks.push({ t, hour, midnight: hour === 0 });
+  }
+  return ticks;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

@@ -110,13 +110,14 @@
       .join("");
   }
 
-  // Same chart as the Mae Klong page: a 6 h window, one shared right edge (the newest data
-  // hour across all gauges) so the same x means the same clock time in every box, and an
-  // hourly ticker. A gauge whose newest reading is older stops short of the edge.
-  const CHART_WINDOW_H = 6;
+  // Same chart as the Mae Klong page: the Window (6 / 12 / 24 h, from the toggle), one shared
+  // right edge (the newest data hour across all gauges) so the same x means the same clock time
+  // in every box, and a ticker. A gauge whose newest reading is older stops short of the edge.
+  let windowH = WindowToggle.current();
   const HOUR = 3600000;
+  const dayLabelAt = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
   function chartHtml(recent, endT) {
-    const startT = endT - CHART_WINDOW_H * HOUR;
+    const startT = endT - windowH * HOUR;
     const pts = recent.map((p) => ({ t: new Date(p.t).getTime(), v: p.v })).filter((p) => p.t >= startT && p.t <= endT);
     if (!pts.length) return `<div class="spark"><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
     const w = 300, h = 56, pad = 6, minRange = 0.1;
@@ -125,34 +126,24 @@
     const xy = pts.map((p) => [pad + ((p.t - startT) / (endT - startT)) * (w - pad * 2), h - pad - ((p.v - min) / (max - min)) * (h - pad * 2)]);
     const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
     const [ex, ey] = xy[xy.length - 1];
-    const ticks = [];
-    for (let t = Math.ceil(startT / HOUR) * HOUR; t <= endT; t += HOUR) {
-      ticks.push({ x: pad + ((t - startT) / (endT - startT)) * (w - pad * 2), hour: (Math.floor(t / HOUR) + 7) % 24 }); // Bangkok = UTC+7
-    }
-    const grid = ticks.map((k) => `<line class="spark-grid" x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
+    const ticks = axisTicks(startT, endT, windowH).map((k) => ({ ...k, x: pad + ((k.t - startT) / (endT - startT)) * (w - pad * 2) }));
+    const grid = ticks.map((k) => `<line class="spark-grid"${k.midnight ? " data-midnight" : ""} x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
     const axis = `<div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${ticks
-      .map((k) => `<span class="tick" style="left:${((k.x / w) * 100).toFixed(2)}%">${String(k.hour).padStart(2, "0")}:00</span>`)
+      .map((k) => `<span class="tick"${k.midnight ? " data-midnight" : ""} style="left:${((k.x / w) * 100).toFixed(2)}%">${k.midnight ? dayLabelAt(k.t) : `${String(k.hour).padStart(2, "0")}:00`}</span>`)
       .join("")}</div>`;
+    // Less history than the Window: say how much there is, never redraw to a different size.
+    const haveH = (endT - new Date(recent[0].t).getTime()) / HOUR;
+    const cover = haveH < windowH - 0.5 ? `<div class="spark-cover">มีข้อมูลเพียง ${Math.round(haveH)} ชม.</div>` : "";
     return `<div class="spark">
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="ระดับผิวน้ำ ${CHART_WINDOW_H} ชั่วโมงที่ผ่านมา">${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" /></svg>${axis}</div>`;
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="ระดับผิวน้ำ ${windowH} ชั่วโมงที่ผ่านมา">${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" /></svg>${axis}${cover}</div>`;
   }
 
   function trendHtml(recent) {
-    const t = trendOf(recent.map((p) => ({ t: p.t, v: p.v })), "v", "t", 3, 0.02);
+    const t = trendOf(recent.map((p) => ({ t: p.t, v: p.v })), "v", "t", windowH, steadyTolerance("gauge", windowH));
     if (!t) return "";
     const [arrow, word] = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] }[t.direction];
-    return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} ${word} ราว 3 ชม.</span></div>`;
-  }
-
-  // Non-tidal gauge only (C.13): net change against ~24 h ago. Not used for tidal gauges, where
-  // the tide is at a different phase at the same clock time each day; they show the day-on-day
-  // change of the daily high and low instead.
-  function longTrendHtml(recent) {
-    const t = trendOf(recent.map((p) => ({ t: p.t, v: p.v })), "v", "t", 24, 0.05);
-    if (!t) return "";
-    const [arrow, word] = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] }[t.direction];
-    const text = t.direction === "steady" ? word : `${word} ${Math.round(Math.abs(t.delta) * 100)} ซม.`;
-    return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} เทียบ 24 ชม.ก่อน: ${text}</span></div>`;
+    const size = t.direction === "steady" ? "" : ` ${Math.round(Math.abs(t.delta) * 100)} ซม.`;
+    return `<div class="flow-meta"><span class="trend" data-dir="${t.direction}">${arrow} ${word}${size} ราว ${windowH} ชม.</span></div>`;
   }
 
   // One node in the same markup as the Mae Klong river line / watched-area card.
@@ -180,9 +171,10 @@
       movement = dailyHtml(d.summary.days);
       if (!movement) remarks.push("รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน");
     } else {
-      const long = longTrendHtml(d.summary.recent);
-      movement = trendHtml(d.summary.recent) + long;
-      if (!long) remarks.push("ยังไม่มีข้อมูลย้อนหลัง 24 ชม. พอเทียบ");
+      // Non-tidal gauge only (C.13). Tidal gauges show the day-on-day change of the daily high
+      // and low instead: the tide is at a different phase at the same clock time each day.
+      movement = trendHtml(d.summary.recent);
+      if (!movement) remarks.push(`ยังไม่มีข้อมูลย้อนหลัง ${windowH} ชม. พอเทียบแนวโน้ม`);
     }
     const group = (html) => (html ? `<div class="flow-group">${html}</div>` : "");
     return `<li class="flow-node${stale ? " flow-stale" : ""}${alerts(station.id, latest.levelMsl, latest.bankMsl) ? " flow-alert" : ""}">${type}<div class="flow-name">${title}</div>
@@ -198,14 +190,26 @@
 
   const state = { axisEndT: 0 };
 
+  // One fetch per gauge summary, shared by every redraw (a Window change redraws, not refetches).
+  const summaryCache = new Map();
+  function getSummary(file) {
+    if (!summaryCache.has(file)) summaryCache.set(file, getJson("data/" + file).catch(() => ({ latest: null, days: [], recent: [] })));
+    return summaryCache.get(file);
+  }
+
+  // Bumped per redraw so one still in flight cannot overwrite a newer one.
+  let renderId = 0;
+
   async function render() {
+    const myRender = ++renderId;
     const stations = new Map(stationsForSite("bangkruai").map((s) => [s.id, s]));
     const data = new Map();
     await Promise.all(
       [...stations.values()].map(async (s) =>
-        data.set(s.id, { summary: await getJson("data/" + s.summary).catch(() => ({ latest: null, days: [], recent: [] })) }),
+        data.set(s.id, { summary: await getSummary(s.summary) }),
       ),
     );
+    if (myRender !== renderId) return;
 
     let newest = 0;
     for (const { summary } of data.values()) {
@@ -259,10 +263,21 @@
     else el.textContent = `ตัวดึงข้อมูลอัตโนมัติ: ดึงสำเร็จล่าสุดเมื่อ ${formatDuration(h.ageMinutes)}ที่แล้ว`;
   }
 
+  const draw = () => {
+    const myDraw = renderId + 1; // render() takes this id as its own
+    return render().catch((err) => {
+      console.error(err);
+      if (myDraw !== renderId) return;
+      document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดข้อมูลไม่สำเร็จ</div>`;
+    });
+  };
+
   renderHealth();
   setInterval(renderHealth, 60000);
-  render().catch((err) => {
-    console.error(err);
-    document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดข้อมูลไม่สำเร็จ</div>`;
-  });
+  WindowToggle.mount(
+    document.getElementById("window-toggle"),
+    "ข้อมูลรายวัน (สูงสุด–ต่ำสุดของวัน) และการเตือนของหน้านี้ไม่เปลี่ยนตามช่วงเวลา",
+    (h) => { windowH = h; draw(); },
+  );
+  draw();
 })();
