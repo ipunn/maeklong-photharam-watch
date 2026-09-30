@@ -1,0 +1,254 @@
+[
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T01:00:00+07:00",
+    "levelMsl": 16.15,
+    "bankMsl": 18,
+    "dischargeM3s": 1699
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T02:00:00+07:00",
+    "levelMsl": 16.18,
+    "bankMsl": 18,
+    "dischargeM3s": 1709.800049
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T03:00:00+07:00",
+    "levelMsl": 16.200000000000003,
+    "bankMsl": 18,
+    "dischargeM3s": 1717
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T04:00:00+07:00",
+    "levelMsl": 16.23,
+    "bankMsl": 18,
+    "dischargeM3s": 1727.800049
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T05:00:00+07:00",
+    "levelMsl": 16.259999999999998,
+    "bankMsl": 18,
+    "dischargeM3s": 1738.599976
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T06:00:00+07:00",
+    "levelMsl": 16.29,
+    "bankMsl": 18,
+    "dischargeM3s": 1749.400024
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T07:00:00+07:00",
+    "levelMsl": 16.310000000000002,
+    "bankMsl": 18,
+    "dischargeM3s": 1756.599976
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T08:00:00+07:00",
+    "levelMsl": 16.34,
+    "bankMsl": 18,
+    "dischargeM3s": 1767.400024
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T09:00:00+07:00",
+    "levelMsl": 16.39,
+    "bankMsl": 18,
+    "dischargeM3s": 1785.400024
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T10:00:00+07:00",
+    "levelMsl": 16.450000000000003,
+    "bankMsl": 18,
+    "dischargeM3s": 1807
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T11:00:00+07:00",
+    "levelMsl": 16.509999999999998,
+    "bankMsl": 18,
+    "dischargeM3s": 1828.599976
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T12:00:00+07:00",
+    "levelMsl": 16.58,
+    "bankMsl": 18,
+    "dischargeM3s": 1853.800049
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T13:00:00+07:00",
+    "levelMsl": 16.66,
+    "bankMsl": 18,
+    "dischargeM3s": 1882.599976
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T14:00:00+07:00",
+    "levelMsl": 16.75,
+    "bankMsl": 18,
+    "dischargeM3s": 1915
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T15:00:00+07:00",
+    "levelMsl": 16.82,
+    "bankMsl": 18,
+    "dischargeM3s": 1940.199951
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T16:00:00+07:00",
+    "levelMsl": 16.86,
+    "bankMsl": 18,
+    "dischargeM3s": 1954.599976
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T17:00:00+07:00",
+    "levelMsl": 16.93,
+    "bankMsl": 18,
+    "dischargeM3s": 1979.800049
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T18:00:00+07:00",
+    "levelMsl": 16.97,
+    "bankMsl": 18,
+    "dischargeM3s": 1994.199951
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T19:00:00+07:00",
+    "levelMsl": 17.04,
+    "bankMsl": 18,
+    "dischargeM3s": 2021.180054
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T20:00:00+07:00",
+    "levelMsl": 17.07,
+    "bankMsl": 18,
+    "dischargeM3s": 2033.310059
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T21:00:00+07:00",
+    "levelMsl": 17.11,
+    "bankMsl": 18,
+    "dischargeM3s": 2049.5
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T22:00:00+07:00",
+    "levelMsl": 17.15,
+    "bankMsl": 18,
+    "dischargeM3s": 2065.675049
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-29T23:00:00+07:00",
+    "levelMsl": 17.18,
+    "bankMsl": 18,
+    "dischargeM3s": 2077.810059
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T01:00:00+07:00",
+    "levelMsl": 17.05,
+    "bankMsl": 18,
+    "dischargeM3s": 2025.224976
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T02:00:00+07:00",
+    "levelMsl": 17.14,
+    "bankMsl": 18,
+    "dischargeM3s": 2061.629883
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T03:00:00+07:00",
+    "levelMsl": 17.200000000000003,
+    "bankMsl": 18,
+    "dischargeM3s": 2085.899902
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T04:00:00+07:00",
+    "levelMsl": 17.25,
+    "bankMsl": 18,
+    "dischargeM3s": 2106.125
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T05:00:00+07:00",
+    "levelMsl": 17.29,
+    "bankMsl": 18,
+    "dischargeM3s": 2122.304932
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T06:00:00+07:00",
+    "levelMsl": 17.34,
+    "bankMsl": 18,
+    "dischargeM3s": 2142.530029
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T07:00:00+07:00",
+    "levelMsl": 17.37,
+    "bankMsl": 18,
+    "dischargeM3s": 2154.665039
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T08:00:00+07:00",
+    "levelMsl": 17.41,
+    "bankMsl": 18,
+    "dischargeM3s": 2170.844971
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T09:00:00+07:00",
+    "levelMsl": 17.439999999999998,
+    "bankMsl": 18,
+    "dischargeM3s": 2182.97998
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T10:00:00+07:00",
+    "levelMsl": 17.47,
+    "bankMsl": 18,
+    "dischargeM3s": 2195.11499
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T11:00:00+07:00",
+    "levelMsl": 17.47,
+    "bankMsl": 18,
+    "dischargeM3s": 2195.11499
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T12:00:00+07:00",
+    "levelMsl": 17.48,
+    "bankMsl": 18,
+    "dischargeM3s": 2199.159912
+  },
+  {
+    "scrapedAt": "2026-09-30T06:57:59.710Z",
+    "updatedAt": "2026-09-30T13:00:00+07:00",
+    "levelMsl": 17.490000000000002,
+    "bankMsl": 18,
+    "dischargeM3s": 2203.205078
+  }
+]
