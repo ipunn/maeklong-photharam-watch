@@ -1,6 +1,6 @@
 # Domain glossary
 
-**Gauge** — a river water-level station tracked via ThaiWater, identified by its ThaiWater `station.id` and (where it has one) an agency code: K.58 บ้านปากแซง (แควน้อย), K.11A บ้านวังขนาย (แม่กลอง, below Mae Klong Dam — inferred, see `.scratch/**/research/river-line-order.md`), K.55A สะพานค่ายหลวง (บ้านโป่ง), RAJ001 โพธาราม. For the Mae Klong Site the situation card shows โพธาราม and the nearest gauge upstream of it.
+**Gauge** — a river water-level station tracked via ThaiWater, identified by its ThaiWater `station.id` and (where it has one) an agency code: K.58 บ้านปากแซง (แควน้อย), K.11A บ้านวังขนาย (แม่กลอง, 1.96 km below the Mae Klong Dam per RID's daily basin diagram, see `.scratch/**/research/mae-klong-dam-data-sources.md`), K.63 บ้านใหม่ (4.26 km further down; the nearest Gauge below the dam that reports a discharge), K.37 บ้านวังเย็น (above the Mae Klong Dam by level, not by any source's statement of river order; reports a discharge), K.55A สะพานค่ายหลวง (บ้านโป่ง), RAJ001 โพธาราม. For the Mae Klong Site the situation card shows โพธาราม and the nearest gauge upstream of it.
 
 **Site** — a watched place with its own gauges, headline and page. Two: อ.โพธาราม (Mae Klong) and พื้นที่ บางกรวย, บางคูเวียง (อ.บางกรวย, นนทบุรี; the waterway nearest the area is คลองบางค้อ). Sites share one Collector and one set of History.
 
@@ -12,11 +12,15 @@
 
 **Daily summary** — the small derived file `data/daily-<gauge>.json` per Bang Kruai gauge: each Bangkok day's high and low (tidal gauges; today is marked partial) plus the last 48 h of readings. Derived from History, never a replacement for it.
 
+**Barrage** — a structure that holds a river up rather than storing water: the Mae Klong Dam (เขื่อนแม่กลอง, อ.ท่าม่วง). All we can read is its water level (EGAT station SND04): no stored volume, no release, no gate data exist as an automatic source. Its release is announced by RID Office 13 by hand. Its level is not a release. Not a Gauge (a Gauge is a river reading) and not a Dam (a Dam has storage).
+
 **Dam** — Vajiralongkorn (แควน้อย) or Srinakarin (แควใหญ่). The two rivers merge at ปากแพรก, Kanchanaburi, into the Mae Klong. A dam is not a Gauge: it has stored volume, level and release rather than a river reading.
+
+**Channel capacity** (ความจุลำน้ำ) — the discharge, in m³/s, that EGAT publishes as a river channel's limit at a station (e.g. 1,955 at K.37). It is the *source's* figure and different sources disagree on it (K.11A: 1,495 EGAT, 1,300 RID), so it is always attributed to its source. It is not a Status threshold. It is an attribute of a station kept as a snapshot with the source's own time, not a History. Not the same as **Capacity (derived)**, which is a Dam's stored volume.
 
 **Reading** — one value set reported by a source at *its own* time (`updatedAt` for gauges, `reportedAt` for dams), distinct from `scrapedAt` (when we fetched it). Freshness is always judged from the source's own time, never from `scrapedAt`. Any reading older than 6 hours is flagged "ข้อมูลอาจไม่อัพเดทล่าสุด". The one exception is EGAT's daily table, which is stamped as of the previous midnight and is flagged after 36 hours.
 
-**Source** — one of three independent feeds: `river` (ThaiWater `waterlevel_load`), `reservoir` (EGAT's daily HTML table), `damHourly` (ThaiWater `analyst/dam`, hourly). Each can fail without stopping the others. `data/status.json` records when each last *succeeded*. The `river` Source is stamped once per Site (`river` for Mae Klong, `riverBangkruai` for Bang Kruai), so one Site's gauges missing from the feed cannot be hidden by the other's success.
+**Source** — one of five independent feeds: `river` (ThaiWater `waterlevel_load`), `reservoir` (EGAT's daily HTML table), `damHourly` (ThaiWater `analyst/dam`, hourly), `damArea` (ThaiWater's per-station `waterlevel_graph`: the Barrage level and K.63, which are absent from `waterlevel_load`), `egatTelemetry` (EGAT's telemetry page, read only for Channel capacity). Each can fail without stopping the others. `data/status.json` records when each last *succeeded*. The `river` Source is stamped once per Site (`river` for Mae Klong, `riverBangkruai` for Bang Kruai), so one Site's gauges missing from the feed cannot be hidden by the other's success.
 
 **Release** — water let out of a dam, shown in m³/s. Headline value: ThaiWater's hourly feed (million m³ over the hour, × 1,000,000 ÷ 3,600). EGAT's daily figure (MCM/day) is secondary.
 
@@ -28,6 +32,6 @@
 
 **Site alert** — the Bang Kruai page's own red signal: BKK003 (the one Gauge near the area) at least 1 m above its bank height (`aboveBankAlert`; margin is a placeholder set by the maintainer). It is display-only: never written to History, never a Status (no source publishes a threshold), and always labelled on the page as this site's own rule, not an official threshold.
 
-**History** — the append-only per-series log under `data/`. A reading identical to the last stored one is not appended again.
+**History** — the append-only per-series log under `data/`. A reading identical to the last stored one is not appended again; a series fed hour by hour from a per-station graph appends only hours newer than the last stored one.
 
 **Collector** — the GitHub Actions workflow that scrapes the sources. Each run starts the next one itself (GitHub's `schedule` proved unreliable). It is judged from `data/status.json`, per source, not from the data itself.

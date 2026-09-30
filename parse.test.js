@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -348,7 +348,7 @@ test("isSameReading ignores scrapedAt and compares the source's values", () => {
 });
 
 test("stationsForSite returns the Mae Klong gauges upstream to downstream, by ThaiWater station id", () => {
-  assert.deepEqual(stationsForSite("maeklong").map((s) => s.id), [505018, 2679, 832066, 710]);
+  assert.deepEqual(stationsForSite("maeklong").map((s) => s.id), [505018, 2571, 2679, 832066, 710]);
 });
 
 test("stationsForSite returns nothing for an unknown Site — never another Site's gauges", () => {
@@ -361,6 +361,13 @@ test("every tracked station has exactly one known Site and no station is listed 
   assert.equal(new Set(ids).size, ids.length);
   const files = TRACKED_STATIONS.map((s) => s.file);
   assert.equal(new Set(files).size, files.length);
+});
+
+test("graph-fed stations have a known Site and never share an id or a history file with a tracked station", () => {
+  for (const s of GRAPH_STATIONS) assert.ok(SITES.includes(s.site), `station ${s.id} has unknown site ${s.site}`);
+  const all = [...TRACKED_STATIONS, ...GRAPH_STATIONS];
+  assert.equal(new Set(all.map((s) => s.id)).size, all.length);
+  assert.equal(new Set(all.map((s) => s.file)).size, all.length);
 });
 
 // Real records captured from the waterlevel_load feed on 2026-09-29 for the Bang Kruai Site,
@@ -628,4 +635,103 @@ test("trendOf: no claim when history does not reach back the Window", () => {
   const eleven = hourlyRise.slice(0, 11); // only 10 h of history
   assert.equal(trendOf(eleven, "levelMsl", "updatedAt", 24, steadyTolerance("gauge", 24)), null);
   assert.ok(trendOf(eleven, "levelMsl", "updatedAt", 6, steadyTolerance("gauge", 6)));
+});
+
+// ---- Barrage (SND04) and K.63: ThaiWater's per-station waterlevel_graph, absent from waterlevel_load ----
+// Real responses captured 2026-09-30 (fixtures/): 36 hourly rows from 2026-09-29 00:00.
+const graphFixture = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", `thaiwater-waterlevel-graph-${name}.json`), "utf8"));
+
+test("parseWaterLevelGraph: the Barrage level series, Bangkok times, no discharge (it has none)", () => {
+  const g = parseWaterLevelGraph(graphFixture("barrage-snd04"));
+  assert.equal(g.rows.length, 36);
+  assert.deepEqual(g.rows[g.rows.length - 1], { updatedAt: "2026-09-30T11:00:00+07:00", levelMsl: 22.757, dischargeM3s: null });
+  assert.equal(g.bankMsl, 26.1);
+  assert.ok(g.rows.every((r) => r.dischargeM3s === null));
+});
+
+test("parseWaterLevelGraph: hours the source has not filled yet are dropped, never stored as zero", () => {
+  const g = parseWaterLevelGraph(graphFixture("k63"));
+  // 36 rows in the response, 3 of them empty (the first hours and the newest, not yet reported)
+  assert.equal(g.rows.length, 33);
+  assert.deepEqual(g.rows[g.rows.length - 1], { updatedAt: "2026-09-30T10:00:00+07:00", levelMsl: 17.47, dischargeM3s: 2195.11499 });
+  assert.ok(g.rows.every((r) => typeof r.levelMsl === "number"));
+  assert.equal(g.bankMsl, 18);
+});
+
+test("parseWaterLevelGraph: a changed or empty response gives no rows instead of throwing", () => {
+  assert.deepEqual(parseWaterLevelGraph(null).rows, []);
+  assert.deepEqual(parseWaterLevelGraph({ result: "OK", data: {} }).rows, []);
+  assert.deepEqual(parseWaterLevelGraph({ data: { graph_data: "oops" } }).rows, []);
+});
+
+test("newGraphRows: an empty history takes every row (the backfill on the first run)", () => {
+  const { rows } = parseWaterLevelGraph(graphFixture("k63"));
+  assert.equal(newGraphRows([], rows).length, 33);
+});
+
+test("newGraphRows: later runs add only hours newer than the last stored one, oldest first", () => {
+  const { rows } = parseWaterLevelGraph(graphFixture("k63"));
+  const history = [{ updatedAt: "2026-09-30T08:00:00+07:00", levelMsl: 17.4 }];
+  const fresh = newGraphRows(history, [...rows].reverse());
+  assert.deepEqual(fresh.map((r) => r.updatedAt), ["2026-09-30T09:00:00+07:00", "2026-09-30T10:00:00+07:00"]);
+});
+
+test("newGraphRows: nothing new, or a history already ahead of the response, adds nothing", () => {
+  const { rows } = parseWaterLevelGraph(graphFixture("k63"));
+  assert.deepEqual(newGraphRows([{ updatedAt: "2026-09-30T10:00:00+07:00" }], rows), []);
+  assert.deepEqual(newGraphRows([{ updatedAt: "2026-10-01T00:00:00+07:00" }], rows), []);
+});
+
+// ---- EGAT telemetry page: read only for Channel capacity (ความจุลำน้ำ) ----
+// The real page captured 2026-09-30 (fixtures/). Columns are read by position, so a layout change
+// must give nothing rather than shifted numbers (same risk as the EGAT reservoir page, ADR 0001).
+const egatTelemetryHtml = fs.readFileSync(path.join(__dirname, "fixtures", "egat-telemetry-schematic.html"), "utf8");
+
+test("parseEgatChannelCapacity: K.37's capacity and the source's own time, Buddhist year converted", () => {
+  const rows = parseEgatChannelCapacity(egatTelemetryHtml);
+  assert.equal(rows.length, 14); // EGAT's own telemetry table only, not the RID table below it
+  const k37 = rows.find((r) => r.stationCode === "VKD06");
+  assert.equal(k37.name, "บ้านวังเย็น (K.37)");
+  assert.equal(k37.capacityM3s, 1955);
+  assert.equal(k37.asOf, "2026-09-30T11:00:00+07:00");
+});
+
+test("parseEgatChannelCapacity: a station with no published capacity is null, never zero", () => {
+  const rows = parseEgatChannelCapacity(egatTelemetryHtml);
+  assert.equal(rows.find((r) => r.stationCode === "SND04").capacityM3s, null); // the Barrage
+  assert.equal(rows.find((r) => r.stationCode === "VKD03").capacityM3s, 970);
+});
+
+test("parseEgatChannelCapacity: a reordered or missing capacity column gives nothing, not shifted numbers", () => {
+  const swapped = egatTelemetryHtml.replace("ความจุลำน้ำ", "ปริมาณสูงสุด");
+  assert.deepEqual(parseEgatChannelCapacity(swapped), []);
+  assert.deepEqual(parseEgatChannelCapacity("<html><body>maintenance</body></html>"), []);
+  assert.deepEqual(parseEgatChannelCapacity(""), []);
+});
+
+test("channelCapacityComparison: a fact, not a Status: above, at or below the source's figure with the difference", () => {
+  assert.deepEqual(channelCapacityComparison(1996.98, 1955), { direction: "above", diffM3s: 41.98 });
+  assert.deepEqual(channelCapacityComparison(1500, 1955), { direction: "below", diffM3s: 455 });
+  assert.deepEqual(channelCapacityComparison(1955, 1955), { direction: "at", diffM3s: 0 });
+});
+
+test("channelCapacityComparison: no claim when either figure is missing", () => {
+  assert.equal(channelCapacityComparison(null, 1955), null);
+  assert.equal(channelCapacityComparison(1996.98, null), null);
+  assert.equal(channelCapacityComparison(undefined, undefined), null);
+});
+
+test("steadyTolerance: river discharge (about 2,000 m3/s) tolerates far more than a dam release does", () => {
+  assert.ok(steadyTolerance("discharge", 6) > steadyTolerance("release", 24));
+  assert.ok(steadyTolerance("discharge", 24) > steadyTolerance("discharge", 12));
+  assert.ok(steadyTolerance("discharge", 12) > steadyTolerance("discharge", 6));
+  assert.equal(steadyTolerance("discharge", 7), steadyTolerance("discharge", 6));
+});
+
+test("bangkokDate: the Bangkok calendar day of a moment, N days back, across the UTC midnight boundary", () => {
+  // Bangkok is UTC+7: 16:59Z is still 23:59 on the 30th, 17:00Z is already 00:00 on 1 Oct.
+  assert.equal(bangkokDate(Date.parse("2026-09-30T16:59:00Z"), 0), "2026-09-30");
+  assert.equal(bangkokDate(Date.parse("2026-09-30T17:00:00Z"), 0), "2026-10-01");
+  assert.equal(bangkokDate(Date.parse("2026-09-30T04:47:00Z"), 1), "2026-09-29");
+  assert.equal(bangkokDate(Date.parse("2026-03-01T03:00:00Z"), 1), "2026-02-28");
 });

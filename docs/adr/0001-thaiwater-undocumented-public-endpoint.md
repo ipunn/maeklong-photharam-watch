@@ -24,6 +24,20 @@ No documented alternative covers the two Mae Klong stations we need.
   layout change silently shifts values. The real page is kept as `fixtures/egat-water-crisis.html`
   and the parse tests fail if the columns move.
 
+- `https://api-v3.thaiwater.net/api/v1/thaiwater30/public/waterlevel_graph` (per-station hourly
+  points for a date range): same status, a different endpoint with its own failure mode. It carries
+  two stations the bulk feed omits: the Mae Klong Dam's station (EGAT SND04, station id 700554,
+  level only) and K.63 บ้านใหม่ (id 4007644, level and discharge). One request per station.
+  The parameter names come from ThaiWater's own web app and a working response, not from
+  documentation (`.scratch/**/research/mae-klong-dam-data-sources.md`). Hours the source has not
+  filled yet come back null and are dropped, never stored as zero. The first run backfills the
+  days the response covers; later runs add only newer hours. Its own Source: `damArea`.
+- `https://water.egat.co.th/telemeter/schematic/index.php`: server-rendered HTML like the reservoir
+  page, columns read by position, header checked first (an unrecognised layout yields nothing, the
+  old snapshot stays and the Source's stamp does not advance). Read only for Channel capacity
+  (ความจุลำน้ำ), which no other source we use publishes. Real page kept as
+  `fixtures/egat-telemetry-schematic.html`. Its own Source: `egatTelemetry`.
+
 ## Decision
 
 Use it anyway, and contain the risk:
@@ -31,7 +45,7 @@ Use it anyway, and contain the risk:
 - All parsing lives in one pure function, `parseWaterLevelRecord` (`parse.js`),
   covered by fixtures captured from the real feed. A shape change breaks one
   function and its tests, not the site.
-- The three sources are independent: one failing does not stop the others, and `data/status.json`
+- The five sources are independent: one failing does not stop the others, and `data/status.json`
   records each source's last success so a dead source cannot hide behind the rest.
 - The scraper never writes a gap entry when a station is missing from a run;
   history stays truthful. The site shows each reading's age and flags stale

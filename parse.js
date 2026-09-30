@@ -336,6 +336,9 @@ const SITES = ["maeklong", "bangkruai"];
 // 2679 K.11A บ้านวังขนาย, 832066 K.55A สะพานค่ายหลวง, 710 โพธาราม.
 const TRACKED_STATIONS = [
   { id: 505018, file: "pak-saeng.json", site: "maeklong" },
+  // K.37 บ้านวังเย็น (อ.ด่านมะขามเตี้ย): reports a discharge. Above the Mae Klong Dam by level
+  // (31.77 m MSL against the dam's 22.76), so it sits before the Barrage in the river line.
+  { id: 2571, file: "k37.json", site: "maeklong" },
   { id: 2679, file: "wang-khanai.json", site: "maeklong" },
   { id: 832066, file: "khai-luang.json", site: "maeklong" },
   { id: 710, file: "photharam.json", site: "maeklong" },
@@ -347,6 +350,14 @@ const TRACKED_STATIONS = [
   { id: 26, file: "cpy014.json", summary: "daily-cpy014.json", site: "bangkruai", tidal: true }, // CPY014 สะพานนวลฉวี ปากเกร็ด
   { id: 4, file: "cpy015.json", summary: "daily-cpy015.json", site: "bangkruai", tidal: true }, // CPY015 สะพานกรุงเทพ
   { id: 2744, file: "c13.json", summary: "daily-c13.json", site: "bangkruai", tidal: false }, // C.13 ท้ายเขื่อนเจ้าพระยา
+];
+
+// Stations ThaiWater serves only through the per-station `waterlevel_graph`, not the bulk
+// `waterlevel_load`. `graphType` is that endpoint's station_type. Ids checked against the live
+// station catalogue 2026-09-30 (.scratch/**/research/mae-klong-dam-data-sources.md).
+const GRAPH_STATIONS = [
+  { id: 700554, file: "barrage-snd04.json", site: "maeklong", graphType: "tele_waterlevel" }, // เขื่อนแม่กลอง (EGAT SND04): the Barrage, level only
+  { id: 4007644, file: "k63.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.63 บ้านใหม่, 4.26 km below K.11A: level and discharge
 ];
 
 function stationsForSite(site) {
@@ -370,9 +381,13 @@ function resolveWindow(search, stored) {
 // When a trend reads "steady", per Window: a longer span lets a small drift add up, so it
 // tolerates more. Gauge in metres; release in m3/s. PLACEHOLDERS for the maintainer to tune
 // (24 h gauge = the old long-view value; release scaled from the old 10 m3/s at the same ratio).
+// Discharge is in m3/s too.
 const STEADY_TOLERANCE = {
   gauge: { 6: 0.03, 12: 0.04, 24: 0.05 },
   release: { 6: 10, 12: 13, 24: 17 },
+  // River flow at K.37 / K.63 / K.55A runs around 2,000 m3/s, where 10 m3/s is noise. PLACEHOLDER,
+  // about 2.5 % of that flow at 6 h, for the maintainer to tune.
+  discharge: { 6: 50, 12: 75, 24: 100 },
 };
 
 function steadyTolerance(kind, windowH) {
@@ -396,6 +411,79 @@ function axisTicks(t0, tN, windowH) {
   return ticks;
 }
 
+// "YYYY-MM-DD" in Bangkok for a moment, `daysAgo` calendar days back. Bangkok is UTC+7 with no DST,
+// so the fixed offset is exact. Used for the date range asked of the per-station graph feed.
+function bangkokDate(ms, daysAgo) {
+  return new Date(ms + 7 * 3600000 - daysAgo * 86400000).toISOString().slice(0, 10);
+}
+
+// Where a discharge sits against a Channel capacity, as a fact (never a Status). Null when either
+// figure is missing. The difference is in m3/s, 2 dp, always >= 0.
+function channelCapacityComparison(dischargeM3s, capacityM3s) {
+  const ok = (v) => typeof v === "number" && Number.isFinite(v);
+  if (!ok(dischargeM3s) || !ok(capacityM3s)) return null;
+  const diffM3s = Math.round(Math.abs(dischargeM3s - capacityM3s) * 100) / 100;
+  return { direction: diffM3s === 0 ? "at" : dischargeM3s > capacityM3s ? "above" : "below", diffM3s };
+}
+
+// ThaiWater's per-station `waterlevel_graph` (the feed behind its chart): hourly points for a
+// date range. It carries stations the bulk `waterlevel_load` omits (the Mae Klong Dam's station
+// SND04, K.63). Hours the source has not filled yet come back with a null value: they are dropped,
+// never stored as zero. Anything malformed gives no rows, not an exception.
+function parseWaterLevelGraph(raw) {
+  const data = raw && raw.data;
+  const points = data && Array.isArray(data.graph_data) ? data.graph_data : [];
+  const rows = points
+    .filter((p) => p && strictNumberOrNull(p.value) !== null)
+    .map((p) => ({
+      updatedAt: toIsoBangkok(p.datetime),
+      levelMsl: strictNumberOrNull(p.value),
+      dischargeM3s: strictNumberOrNull(p.discharge),
+    }));
+  return { rows, bankMsl: data ? strictNumberOrNull(data.min_bank) : null };
+}
+
+// Which graph rows are not yet in the History: those strictly newer than the last stored
+// `updatedAt`, oldest first. An empty History takes them all, which is how the first run
+// backfills the days the response covers. History stays append-only and truthful.
+function newGraphRows(history, rows) {
+  const last = history.length ? new Date(history[history.length - 1].updatedAt).getTime() : -Infinity;
+  return rows
+    .filter((r) => new Date(r.updatedAt).getTime() > last)
+    .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+}
+
+// EGAT's telemetry page (water.egat.co.th/telemeter/schematic): server-rendered HTML tables.
+// Read ONLY for Channel capacity (ความจุลำน้ำ) of EGAT's own stations (VKD/SND codes; the RID
+// K-station table below them is not read, we get those from ThaiWater). Columns are read by
+// position, so the header is checked first: an unrecognised layout gives [], never shifted numbers.
+// Dates are Buddhist-era dd-mm-yyyy hh:mm:ss in Bangkok time.
+const EGAT_TELEMETRY_COLS = { code: 1, name: 2, time: 6, capacity: 7 };
+
+function parseEgatChannelCapacity(html) {
+  if (typeof html !== "string") return [];
+  const text = (cell) => cell.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  const out = [];
+  for (const table of html.match(/<table[\s\S]*?<\/table>/g) || []) {
+    const rows = (table.match(/<tr[\s\S]*?<\/tr>/g) || []).map((r) => (r.match(/<t[dh][\s\S]*?<\/t[dh]>/g) || []).map(text));
+    const header = rows.find((cells) => cells.length === 8 && cells[EGAT_TELEMETRY_COLS.code] === "รหัสสถานี");
+    if (!header) continue;
+    if (!header[EGAT_TELEMETRY_COLS.capacity].startsWith("ความจุลำน้ำ") || !header[EGAT_TELEMETRY_COLS.time].startsWith("ณ วัน")) return [];
+    for (const cells of rows) {
+      if (cells.length !== 8 || !/^(VKD|SND)\d+$/.test(cells[EGAT_TELEMETRY_COLS.code])) continue;
+      const stamp = cells[EGAT_TELEMETRY_COLS.time].match(/^(\d\d)-(\d\d)-(\d{4}) (\d\d:\d\d:\d\d)$/);
+      out.push({
+        stationCode: cells[EGAT_TELEMETRY_COLS.code],
+        name: cells[EGAT_TELEMETRY_COLS.name],
+        capacityM3s: strictNumberOrNull(cells[EGAT_TELEMETRY_COLS.capacity].replace(/,/g, "")),
+        asOf: stamp ? `${Number(stamp[3]) - 543}-${stamp[2]}-${stamp[1]}T${stamp[4]}+07:00` : null,
+      });
+    }
+    break; // the first table with this header is EGAT's own
+  }
+  return out;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

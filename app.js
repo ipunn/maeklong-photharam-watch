@@ -214,6 +214,14 @@
   let windowH = WindowToggle.current();
   const HEADLINE_WINDOW_H = 6;
 
+  // River-line only (no detail card). K.37 is above the Mae Klong Dam (its level is higher than the
+  // dam's), K.63 is 4.26 km below K.11A; both report a discharge. `capacityCode` links a gauge to
+  // EGAT's Channel capacity row (data/egat-channel-capacity.json).
+  const K37 = { file: "data/k37.json", name: "บ้านวังเย็น (K.37)", role: "เหนือเขื่อน (ตามระดับน้ำ)", staleMinutes: STALE_MINUTES, capacityCode: "VKD06" };
+  const K63 = { file: "data/k63.json", name: "บ้านใหม่ (K.63)", role: "ท้ายจุด K.11A 4.26 กม.", staleMinutes: STALE_MINUTES };
+  // The Barrage: a level and nothing else (no release, no gates, no stored volume).
+  const BARRAGE = { file: "data/barrage-snd04.json", name: "เขื่อนแม่กลอง", code: "SND04" };
+
   // The two upstream rivers are PARALLEL, not in sequence: they merge at Kanchanaburi
   // into the Mae Klong, so they are drawn as separate branches, then one main line.
   const BRANCHES = [
@@ -226,7 +234,7 @@
       ],
     },
   ];
-  const MERGE_TEXT = "<span class=\"merge-lead\">แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → </span>ผ่าน <b>เขื่อนแม่กลอง</b> (ไม่มีข้อมูลอัตโนมัติ) แล้วถึงจุดวัดด้านล่าง";
+  const MERGE_TEXT = "<span class=\"merge-lead\">แควใหญ่ + แควน้อย รวมเป็น <b>แม่น้ำแม่กลอง</b> → </span>ผ่านจุดวัดด้านบน แล้วถึง <b>เขื่อนแม่กลอง</b> ก่อนถึงจุดวัดด้านล่าง";
   // Phones stack the two branches, which reads as one line. This small Y diagram shows
   // two rivers converging into one. Hidden on wide screens, where the branches sit side
   // by side and a real join bar already shows it.
@@ -237,14 +245,17 @@
       </svg>
       <div class="md-bottom">รวมเป็นแม่น้ำแม่กลอง ที่ปากแพรก จ.กาญจนบุรี</div></div>`;
   const MAIN = [
+    { kind: "gauge", station: K37 },
+    { kind: "barrage", barrage: BARRAGE },
     { kind: "gauge", station: STATIONS[1] },
+    { kind: "gauge", station: K63 },
     { kind: "gauge", station: STATIONS[2] },
     { kind: "you", name: "พื้นที่ของคุณ", text: "อำเภอโพธาราม จังหวัดราชบุรี" },
     { kind: "gauge", station: STATIONS[3] },
   ];
   const FLOW = [...BRANCHES.flatMap((b) => b.nodes), ...MAIN];
 
-  const TYPE_LABEL = { dam: "เขื่อน", gauge: "จุดวัดระดับน้ำในแม่น้ำ" };
+  const TYPE_LABEL = { dam: "เขื่อน", gauge: "จุดวัดระดับน้ำในแม่น้ำ", barrage: "เขื่อนทดน้ำ · มีข้อมูลระดับน้ำเท่านั้น" };
   const TREND_TEXT = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] };
 
   // Gauges: centimetres and cm/hour (people read cm, not "0.13 m"). Dams: m3/s.
@@ -257,10 +268,12 @@
     // moved against it (by at least the source's own 1 cm resolution).
     const against = t.direction === "rising" ? t.lastDelta < 0 : t.lastDelta > 0;
     const stepArrow = t.lastDelta < 0 ? "▼" : "▲";
-    if (kind === "dam") {
-      const note = against && Math.abs(t.lastDelta) >= steadyTolerance("release", windowH)
+    if (kind === "dam" || kind === "discharge") {
+      // A dam's release, or a river's flow at a gauge: both in m3/s, each with its own "steady" size.
+      const noun = kind === "dam" ? "อัตราระบาย" : "อัตราการไหล";
+      const note = against && Math.abs(t.lastDelta) >= steadyTolerance(kind === "dam" ? "release" : "discharge", windowH)
         ? ` <span class="trend-note">· รอบล่าสุด ${stepArrow} ${Math.abs(Math.round(t.lastDelta))} ลบ.ม./วินาที</span>` : "";
-      return `<span class="trend" data-dir="${t.direction}">${arrow} อัตราระบาย${word} ${Math.abs(Math.round(t.delta))} ลบ.ม./วินาที ${span}</span>${note}`;
+      return `<span class="trend" data-dir="${t.direction}">${arrow} ${noun}${word} ${Math.abs(Math.round(t.delta))} ลบ.ม./วินาที ${span}</span>${note}`;
     }
     const cm = Math.abs(t.delta) * 100;
     const perHour = cm / t.spanHours;
@@ -367,6 +380,19 @@
     return `<div class="flow-meta" data-stale="${d.stale}">${age}${warn}</div>`;
   }
 
+  // EGAT's Channel capacity, loaded per redraw (renderFlow). Used only while EGAT's own reading time
+  // is fresh, so an old figure is never shown as current. A fact beside the discharge, no colour.
+  let egatCapacity = null;
+  const fmtM3s = (n) => Math.round(n).toLocaleString("en-US");
+  function capacityHtml(station, dischargeM3s) {
+    const c = station.capacityCode && egatCapacity && egatCapacity[station.capacityCode];
+    if (!c || typeof c.capacityM3s !== "number") return "";
+    const cmp = channelCapacityComparison(dischargeM3s, c.capacityM3s);
+    const diff = !cmp ? "" : cmp.direction === "at" ? " · เท่ากับความจุลำน้ำ"
+      : ` · ${cmp.direction === "above" ? "สูงกว่า" : "ต่ำกว่า"}ความจุลำน้ำ ≈ ${fmtM3s(cmp.diffM3s)} ลบ.ม./วินาที`;
+    return `<div class="flow-meta">ความจุลำน้ำตาม กฟผ. ${fmtM3s(c.capacityM3s)} ลบ.ม./วินาที (ณ ${formatShortTime(c.asOf)})${diff}</div>`;
+  }
+
   function flowNodeHtml(node, d, roleOverride) {
     if (node.kind === "you") {
       return `<li class="flow-node flow-you"><div class="flow-type">พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
@@ -374,7 +400,9 @@
     const type = `<div class="flow-type" data-type="${node.kind}">${TYPE_LABEL[node.kind]}</div>`;
     const st = node.station;
     const role = roleOverride ?? (st && st.role);
-    const title = node.kind === "dam" ? node.name : `${st.name}${role ? ` <span class="flow-role">${role}</span>` : ""}`;
+    const title = node.kind === "dam" ? node.name
+      : node.kind === "barrage" ? `${node.barrage.name} <span class="flow-role">${node.barrage.code} · ระดับน้ำที่สถานีเขื่อน</span>`
+      : `${st.name}${role ? ` <span class="flow-role">${role}</span>` : ""}`;
     if (!d) {
       return `<li class="flow-node">${type}<div class="flow-name">${title}</div><div class="flow-meta">ไม่มีข้อมูล</div></li>`;
     }
@@ -396,10 +424,24 @@
     }
     // "No data yet" messages are remarks in small grey text, apart from the measurements.
     const remarks = [];
+    if (node.kind === "barrage") {
+      // A level only: never presented as a release (the release is announced by hand by RID Office 13).
+      remarks.push("ไม่มีข้อมูลอัตโนมัติของอัตราระบายและการเปิดบานของเขื่อน ประกาศโดยสำนักงานชลประทานที่ 13");
+    }
     if (!d.trend) remarks.push(`ยังไม่มีข้อมูลย้อนหลัง ${windowH} ชม. พอเทียบแนวโน้ม`);
+    const q = node.kind === "gauge" ? d.latestQ : null;
+    if (q) remarks.push("เป็นอัตราการไหลของแม่น้ำที่จุดวัด ไม่ใช่อัตราระบายของเขื่อน");
+    // The discharge has its own reading time: say so when it is not the newest row's, and flag it when old.
+    const qNote = q && (q.updatedAt !== d.latest.updatedAt || d.qStale)
+      ? `<div class="flow-meta" data-stale="${d.qStale}">อัตราการไหลข้อมูล ณ ${formatShortTime(q.updatedAt)}${d.qStale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div>` : "";
+    const flowValue = q
+      ? `<div class="flow-group"><div class="flow-value"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ≈ ${fmtM3s(q.dischargeM3s)} <span class="unit">ลบ.ม./วินาที</span></div>
+         ${d.dischargeTrend ? `<div class="flow-meta">${trendHtml(d.dischargeTrend, "discharge")}</div>` : ""}${d.qStale ? "" : capacityHtml(node.station, q.dischargeM3s)}${qNote}</div>`
+      : "";
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
-      <div class="flow-value"><span class="flow-label">ระดับผิวน้ำ</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
+      <div class="flow-value"><span class="flow-label">${node.kind === "barrage" ? "ระดับน้ำที่เขื่อน" : "ระดับผิวน้ำ"}</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
+      ${flowValue}
       ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "gauge")}</div></div>` : ""}
       <div class="flow-group">${freshnessHtml(d)}</div>
       ${remarks.length ? `<div class="flow-remark">${remarks.join("<br>")}</div>` : ""}</div>
@@ -426,13 +468,17 @@
         asOf: latest.reportedAt ? formatShortTime(latest.reportedAt) : null,
       };
     }
-    const rows = await getHistory(node.station.file).catch(() => []);
+    const rows = await getHistory(node.kind === "barrage" ? node.barrage.file : node.station.file).catch(() => []);
     const latest = rows[rows.length - 1];
     if (!latest || typeof latest.levelMsl !== "number") return null;
     const mins = ageMinutes(latest.updatedAt);
+    const latestQ = [...rows].reverse().find((r) => typeof r.dischargeM3s === "number") || null;
     return {
       latest,
       rows,
+      latestQ,
+      qStale: !latestQ || !(ageMinutes(latestQ.updatedAt) <= STALE_MINUTES),
+      dischargeTrend: trendOf(rows, "dischargeM3s", "updatedAt", windowH, steadyTolerance("discharge", windowH)),
       trend: trendOf(rows, "levelMsl", "updatedAt", windowH, steadyTolerance("gauge", windowH)),
       headlineTrend: trendOf(rows, "levelMsl", "updatedAt", HEADLINE_WINDOW_H, steadyTolerance("gauge", HEADLINE_WINDOW_H)),
       mins,
@@ -452,6 +498,14 @@
     await Promise.all(
       FLOW.filter((n) => n.kind !== "you").map(async (n) => datas.set(n, await nodeData(n).catch(() => null))),
     );
+    egatCapacity = await fetch("data/egat-channel-capacity.json", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((snap) => {
+        if (!snap || !snap.stations) return null;
+        // Only figures whose own reading time is fresh; an old one reads as no figure.
+        return Object.fromEntries(Object.entries(snap.stations).filter(([, v]) => ageMinutes(v.asOf) <= STALE_MINUTES));
+      })
+      .catch(() => null);
     if (myRender !== renderId) return;
     const items = (nodes) => nodes.map((n) => flowNodeHtml(n, datas.get(n))).join("");
     // Situation card: what matters most for the user's area first (Photharam, the gauge in
@@ -469,11 +523,26 @@
       const staleUp = upstreamGauges.filter((n) => datas.get(n).stale).length;
       const damLines = FLOW.filter((n) => n.kind === "dam" && datas.get(n) && datas.get(n).latest.releaseM3s != null)
         .map((n) => `${n.name.replace("เขื่อน", "")} ≈ ${datas.get(n).latest.releaseM3s.toLocaleString("en-US")}${datas.get(n).stale ? ` (${STALE_TEXT})` : ""}`);
+      // The Barrage is not in the tally above (it holds its pool near a target, so its level barely
+      // moves however much it releases). Its own line, on the fixed headline span like the rest.
+      const bd = datas.get(MAIN.find((n) => n.kind === "barrage"));
+      const bt = bd && bd.headlineTrend ? TREND_TEXT[bd.headlineTrend.direction] : null;
+      const barrageLine = bd
+        ? `<div><b>เขื่อนแม่กลอง</b> — ระดับน้ำที่เขื่อน ${bd.latest.levelMsl.toFixed(2)} ม.รทก.${bt ? ` ${bt[0]} ${bt[1]} ราว ${HEADLINE_WINDOW_H} ชม.` : ""}${bd.stale ? ` · <span class="health-warn">${STALE_TEXT}</span>` : ""} · ไม่มีข้อมูลอัตโนมัติของอัตราระบาย (ประกาศโดยสำนักงานชลประทานที่ 13)</div>`
+        : "";
+      const flowPart = (st, label) => {
+        const nd = datas.get(FLOW.find((n) => n.station === st));
+        return nd && nd.latestQ
+          ? `${label} ≈ ${fmtM3s(nd.latestQ.dischargeM3s)}${nd.qStale ? ` (${STALE_TEXT})` : ""}` : null;
+      };
+      const flowParts = [flowPart(K37, "บ้านวังเย็น K.37 (เหนือเขื่อนตามระดับน้ำ)"), flowPart(K63, "K.63 (ท้ายเขื่อน ท้ายจุด K.11A)"), flowPart(STATIONS[2], "สะพานค่ายหลวง")].filter(Boolean);
       here.innerHTML = `<h2 class="section-title">พื้นที่เฝ้าระวัง <span class="here-sub">อ.โพธาราม จ.ราชบุรี</span></h2>
         <ul class="here-grid">${flowNodeHtml(phNode, datas.get(phNode), "ในพื้นที่ / ท้ายน้ำ")}${flowNodeHtml(bpNode, datas.get(bpNode), "เหนือน้ำใกล้สุด")}</ul>
         <div class="here-summary">
           <div><b>สัญญาณจากต้นน้ำ</b> — จุดวัด ${upstreamGauges.length} แห่งเหนือพื้นที่ของคุณ: ▲ สูงขึ้น ${count("rising")} · ► ทรงตัว ${count("steady")} · ▼ ลดลง ${count("falling")}${unknown ? ` · ยังเทียบไม่ได้ ${unknown}` : ""}${staleUp ? ` · <span class="health-warn">${STALE_TEXT} ${staleUp} จุด</span>` : ""}</div>
           ${damLines.length ? `<div>เขื่อนระบายน้ำ (ลบ.ม./วินาที): ${damLines.join(" · ")}</div>` : ""}
+          ${barrageLine}
+          ${flowParts.length ? `<div>อัตราการไหลของแม่น้ำ (ลบ.ม./วินาที): ${flowParts.join(" · ")}</div>` : ""}
           <div class="here-more">ดูต้นน้ำและเขื่อนเพิ่มเติมด้านล่าง</div>
         </div>`;
     }
@@ -496,6 +565,8 @@
     river: "ระดับน้ำแม่น้ำ (ThaiWater)",
     reservoir: "เขื่อนรายวัน (กฟผ.)",
     damHourly: "เขื่อนรายชั่วโมง (ThaiWater)",
+    damArea: "ระดับน้ำเขื่อนแม่กลองและ K.63 (ThaiWater)",
+    egatTelemetry: "ความจุลำน้ำ (กฟผ.)",
   };
   let collectorStatus = null;
 

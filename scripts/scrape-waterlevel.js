@@ -1,4 +1,4 @@
-// Runs on a GitHub Actions cron. Fetches three independent public sources, extracts the
+// Runs on a GitHub Actions cron. Fetches five independent public sources, extracts the
 // tracked river gauges and dams, and appends to per-series history files under data/
 // (an append-only log, never a "latest reading" snapshot — see
 // .scratch/maeklong-photharam-water-monitor/spec.md).
@@ -22,6 +22,11 @@ const {
   parseDamHourlyRecord,
   pickLatestDamHourly,
   isSameReading,
+  parseWaterLevelGraph,
+  newGraphRows,
+  parseEgatChannelCapacity,
+  GRAPH_STATIONS,
+  bangkokDate,
   dailyHighLow,
   seriesOf,
   TRACKED_STATIONS,
@@ -50,6 +55,16 @@ const DAMS_HOURLY = [
   { id: 56, file: "dam-hourly-vajiralongkorn.json" },
   { id: 54, file: "dam-hourly-srinakarin.json" },
 ];
+
+// ThaiWater's per-station chart feed: hourly points for a date range. It serves stations the bulk
+// feed above omits (the Mae Klong Dam's station, K.63). Same status as the bulk feed (docs/adr/0001).
+const GRAPH_URL = "https://api-v3.thaiwater.net/api/v1/thaiwater30/public/waterlevel_graph";
+// Days of history requested each run. The first run stores all of them (a backfill); later runs
+// add only the hours newer than the last stored one.
+const GRAPH_DAYS = 2;
+
+// EGAT's telemetry page: server-rendered HTML, read only for Channel capacity.
+const EGAT_TELEMETRY_URL = "https://water.egat.co.th/telemeter/schematic/index.php";
 
 function readJson(file, fallback) {
   try {
@@ -92,8 +107,21 @@ function writeSummary(summaryFile, history, tidal, nowMs) {
   writeJsonAtomic(summaryFile, { latest: history[history.length - 1] || null, days: tidal ? dailyHighLow(history, nowMs) : [], recent });
 }
 
+// Appends several rows in one write. Same guarantees as appendHistory: append-only, atomic.
+function appendRows(file, rows) {
+  const history = readJson(file, []);
+  if (!Array.isArray(history)) throw new Error(`${file} is not a JSON array`);
+  if (!rows.length) return 0;
+  history.push(...rows);
+  writeJsonAtomic(file, history);
+  return rows.length;
+}
+
+// A hung request must not hold up the sources after it (they run one after another): give up after 30 s.
+const FETCH_TIMEOUT_MS = 30000;
+
 async function fetchOk(url, asJson) {
-  const res = await fetch(url, asJson ? { headers: { Accept: "application/json" } } : undefined);
+  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), ...(asJson ? { headers: { Accept: "application/json" } } : {}) });
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
   return asJson ? res.json() : res.text();
 }
@@ -208,7 +236,67 @@ async function scrapeDamsHourly(scrapedAt) {
   return succeeded(outcomes);
 }
 
-const SOURCES = { river: scrapeRivers, reservoir: scrapeReservoirs, damHourly: scrapeDamsHourly };
+// The Barrage's level and K.63, from the per-station graph feed. One request per station.
+async function scrapeDamArea(scrapedAt) {
+  const nowMs = new Date(scrapedAt).getTime();
+  const outcomes = [];
+  for (const { id, file, graphType } of GRAPH_STATIONS) {
+    let raw;
+    try {
+      const url = `${GRAPH_URL}?station_type=${graphType}&station_id=${id}&start_date=${bangkokDate(nowMs, GRAPH_DAYS - 1)}&end_date=${bangkokDate(nowMs, 0)}`;
+      raw = await fetchOk(url, true);
+    } catch (err) {
+      console.error(`${file}: FAILED`, err);
+      outcomes.push("failed");
+      continue;
+    }
+    outcomes.push(
+      runItem(file, () => {
+        const { rows, bankMsl } = parseWaterLevelGraph(raw);
+        if (!rows.length) throw missing(`station ${id} returned no readings`);
+        const fresh = newGraphRows(readJson(file, []), rows).map((r) => {
+          const row = { scrapedAt, updatedAt: r.updatedAt, levelMsl: r.levelMsl, bankMsl };
+          if (r.dischargeM3s != null) row.dischargeM3s = r.dischargeM3s;
+          return row;
+        });
+        const added = appendRows(file, fresh);
+        return `appended ${added} of ${rows.length} rows, newest ${rows[rows.length - 1].updatedAt}`;
+      }),
+    );
+  }
+  return succeeded(outcomes);
+}
+
+// EGAT's Channel capacity for the stations we show. An attribute of a station, not a Reading, so
+// it is a small snapshot (with the page's own time) and not a History. A page whose layout is not
+// recognised gives no rows: this fails, the old snapshot stays, and the stamp does not advance.
+const EGAT_CAPACITY_FILE = "egat-channel-capacity.json";
+const EGAT_CAPACITY_CODES = ["VKD06"]; // K.37 บ้านวังเย็น
+
+async function scrapeEgatTelemetry(scrapedAt) {
+  const html = await fetchOk(EGAT_TELEMETRY_URL, false);
+  const rows = parseEgatChannelCapacity(html);
+  const outcome = runItem(EGAT_CAPACITY_FILE, () => {
+    const stations = {};
+    for (const code of EGAT_CAPACITY_CODES) {
+      const row = rows.find((r) => r.stationCode === code);
+      if (!row) throw missing(`EGAT station ${code}`);
+      if (!row.asOf) throw new Error(`EGAT station ${code}: unreadable time`);
+      stations[code] = { name: row.name, capacityM3s: row.capacityM3s, asOf: row.asOf };
+    }
+    writeJsonAtomic(EGAT_CAPACITY_FILE, { scrapedAt, stations });
+    return Object.entries(stations).map(([c, v]) => `${c}=${v.capacityM3s} asOf=${v.asOf}`).join(" ");
+  });
+  return succeeded([outcome]);
+}
+
+const SOURCES = {
+  river: scrapeRivers,
+  reservoir: scrapeReservoirs,
+  damHourly: scrapeDamsHourly,
+  damArea: scrapeDamArea,
+  egatTelemetry: scrapeEgatTelemetry,
+};
 
 async function main() {
   fs.mkdirSync(DATA_DIR, { recursive: true });

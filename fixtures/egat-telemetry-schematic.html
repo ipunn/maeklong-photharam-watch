@@ -1,0 +1,326 @@
+﻿
+﻿
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<!--<meta name="viewport" content="width=device-width, initial-scale=1">-->
+	<title>แผนผังน้ำระบบโทรมาตรลุ่มน้ำแม่กลอง</title>
+	<script language="JavaScript">
+		if(screen.width <= 1400){document.write("<style>body{zoom:70%;}</style>");}
+		if(screen.width > 1400){document.write("<style>body{zoom:90%;}</style>");}
+	</script>
+	<link rel="stylesheet" href="css/CSS_w3.css">
+	<link rel="stylesheet" href="css/telemeter.css">
+	
+</head>
+
+<body>
+	
+	 <div style="position:absolute; top:10; left:10; z-index:2">
+		﻿<!--<link rel="stylesheet" href="css/font-awesome.min.css">-->
+<style>
+	
+	.topnav {
+	  overflow: hidden;
+	  background-color: #F8EA0D;
+	}
+
+	.topnav a {
+	  float: left;
+	  display: block;
+	  color: blue;
+	  text-align: center;
+	  padding: 14px 16px;
+	  text-decoration: none;
+	  font-size: 17px;
+	  border-radius: 5px;
+	}
+
+	.topnav a:hover {
+	  background-color: #BAF4FC;
+	  color: black;
+	}
+
+	.active {
+	  background-color: #5DADE2;
+	  color: blue;
+	}
+
+	.topnav .icon {
+	  display: none;
+	}
+	
+	.dropdown {
+	  float: left;
+	  overflow: hidden;
+	}
+
+	.dropdown .dropbtn {
+	  font-size: 17px;    
+	  border: none;
+	  outline: none;
+	  color: #04BDF3;
+	  padding: 14px 16px;
+	  background-color: inherit;
+	  font-family: inherit;
+	  margin: 0;
+	  border-radius: 5px;
+	}
+
+	.dropdown-content {
+	  display: none;
+	  position: absolute;
+	  background-color: #f9f9f9;
+	  min-width: 160px;
+	  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+	  z-index: 5;
+	}
+
+	.dropdown-content a {
+	  float: none;
+	  color: #04BDF3;
+	  padding: 12px 16px;
+	  text-decoration: none;
+	  display: block;
+	  text-align: left;
+	}
+
+	.topnav a:hover, .dropdown:hover .dropbtn {
+	  background-color: #04BDF3;
+	  color: white;
+	}
+
+	.dropdown-content a:hover {
+	  background-color: #C3ECF8;
+	  color: blue;
+	}
+
+	.dropdown:hover .dropdown-content {
+	  display: block;
+	}
+
+	@media screen and (max-width: 300px) {
+	  .topnav a:not(:first-child), .dropdown .dropbtn {
+		display: none;
+	  }
+	  .topnav a.icon {
+		float: right;
+		display: block;
+	  }
+	}
+
+	@media screen and (max-width: 300px) {
+	  .topnav.responsive {position: relative;}
+	  .topnav.responsive .icon {
+		position: absolute;
+		right: 0;
+		top: 0;
+	  }
+	  .topnav.responsive a {
+		float: none;
+		display: block;
+		text-align: left;
+	  }
+	  .topnav.responsive .dropdown {float: none;}
+	  .topnav.responsive .dropdown-content {position: relative;}
+	  .topnav.responsive .dropdown .dropbtn {
+		display: block;
+		width: 100%;
+		text-align: left;
+	  }
+	}
+ 	 
+	.displayDATA {
+	  background-color: yellow;
+	  color: blue;
+	  margin: 5px;
+	  padding: 5px;
+	} 
+	.displayDATA_1 {
+	  background-color: white;
+	  margin: 5px;
+	  padding: 5px;
+	}
+	
+	input.MyButton {
+	width: 135px;
+	padding: 10px;
+	cursor: pointer;
+	font-weight: bold;
+	font-size: 100%;
+	background: #0000FF;
+	color: #fff;
+	border: 1px solid #3366cc;
+	border-radius: 5px;
+	}
+	input.MyButton:hover {
+	color: #fff;
+	background: #50C4DC ;
+	border: 1px solid #fff;
+	}
+	.pill-nav a {
+	  display: inline-block;
+	  color: black;
+	  text-align: center;
+	  padding: 14px;
+	  text-decoration: none;
+	  font-size: 17px;
+	  border-radius: 5px;
+	}
+
+	.pill-nav a:hover {
+	  background-color: #ddd;
+	  color: black;
+	}
+
+	.pill-nav a.active {
+	  background-color: dodgerblue;
+	  color: white;
+</style>
+<div>
+<div class="displayDATA_1">
+	<img class="img-responsive" src="img/Banner_Monitoring_new.jpg" width="100%" />
+</div>
+<div class="displayDATA">
+	
+	<div class="topnav" id="myTopnav">
+		  <a href="index.php"></a>
+		  <a href="BB_anni.php">เขื่อนภูมิพล</a>
+		  <a href="SK_anni.php">เขื่อนสิริกิติ์</a>
+		  <a href="mk_anni.php">ลุ่มน้ำแม่กลอง</a>
+		  <a href="rpb_anni.php">เขื่อนรัชชประภา</a>
+		  <a href="ur_anni.php">เขื่อนอุบลรัตน์</a>
+		  <a href="pm_anni.php">เขื่อนปากมูล</a>
+		  <a href="blg_anni.php">เขื่อนบางลาง</a>
+          <a href="mm_anni.php">กฟผ.แม่เมาะ</a> 
+			<div class="dropdown">
+				<button class="dropbtn">Link เกี่ยวข้อง 
+				  <i class="fa fa-caret-down"></i>
+				</button>
+				<div class="dropdown-content">
+				  <a href="http://watertele.egat.co.th/" target="_blank">ระบบโทรมาตร กฟผ.</a>
+				  <a href="http://water.egat.co.th/telemeter/" target="_blank">ระบบติดตามและประเมินผลการใช้งานระบบโทรมาตร</a>
+				  <!--<a href="http://water.egat.co.th/ratingcurve/#mk">Rating Curve Data</a>-->
+				</div>
+			</div
+		  <a href="javascript:void(0);" class="icon" onclick="myFunction()">
+			<i class="fa fa-bars"></i>
+		  </a>
+	</div>
+	
+	<!--
+	<div id="menu">
+		<form>
+			<input class="MyButton" type="button" value="Home" onclick="window.location.href='index.php'" />
+			<input class="MyButton" type="button" value="เขื่อนภูมิพล" onclick="window.location.href='BB_anni.php'" />
+			<input class="MyButton" type="button" value="เขื่อนสิริกิติ์" onclick="window.location.href='SK_anni.php'" />
+			<input class="MyButton" type="button" value="ลุ่มน้ำแม่กลอง" onclick="window.location.href='mk_anni.php'" />
+			<input class="MyButton" type="button" value="เขื่อนรัชชประภา" onclick="window.location.href='rpb_anni.php'" />
+			<input class="MyButton" type="button" value="เขื่อนอุบลรัตน์" onclick="window.location.href='ur_anni.php'" />
+		</form>
+		
+	</div>
+	-->
+			<table><tr><td></td><td></td></tr></table>
+</div>
+
+</div>
+
+<script>
+function myFunction() {
+  var x = document.getElementById("myTopnav");
+  if (x.className === "topnav") {
+    x.className += " responsive";
+  } else {
+    x.className = "topnav";
+  }
+}
+</script>
+	
+	 <div style="position:absolute; top:240; left:10; z-index:1">
+		
+		<img src="tele_mk_anni.php">
+	</div> 
+	<div style="position:absolute; top:240; left:10; z-index:0">
+		  
+		  <img src="images/Version2_MK.gif" > 
+	</div> 
+	
+		
+	<div style="position:absolute; top:1840; left:0; z-index:3">
+		</br>
+		
+
+<div class="w3-container">
+	<table class="w3-table-all w3-centered table-hover">
+		<thead>
+		<tr class="w3-yellow">
+			<th ><center>ลำดับที่</center></th>
+			<th ><center>รหัสสถานี</center></th>
+			<th ><center>ชื่อสถานี</center></th>
+			<th ><center>ระดับน้ำ(ม.)</center></th>
+			<th ><center>ระดับน้ำ(ม. รทก.)</center></th>
+			<th ><center>ปริมาณ(ลบ.ม/วินาที)</center></th>
+			<th ><center>ณ วัน-เดือน-ปี : เวลา</center></th>
+			<th ><center>ความจุลำน้ำ (ลบ.ม./วินาที)</center></th>
+		</tr>
+		</thead>
+		<tbody>
+			 <tr><td>1</td><td>VKD01</td><td>อ.ทองผาภูมิ</td><td>6.58</td><td>80.58</td><td>811.88</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>2</td><td>VKD02</td><td>บ้านหินดาด</td><td>6.55</td><td>70.55</td><td>960.71</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>3</td><td>VKD03</td><td>บ้านลิ่นถิ่น (K.54)</td><td>6.28</td><td>66.88</td><td>770.18</td><td>30-09-2569 11:00:00</td><td>970.00</td></tr><tr><td>4</td><td>VKD04</td><td>บ้านปากแซง (K.58)</td><td>12.15</td><td>51.65</td><td>-</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>5</td><td>VKD05</td><td>บ้านลุ่มสุ่ม (K.10)</td><td>14.65</td><td>45.05</td><td>-</td><td>30-09-2569 11:00:00</td><td>1,039.23</td></tr><tr><td>6</td><td>VKD06</td><td>บ้านวังเย็น (K.37)</td><td>12.00</td><td>31.80</td><td>2,005.20</td><td>30-09-2569 11:00:00</td><td>1,955.00</td></tr><tr><td>7</td><td>VKD07</td><td>บ้านแม่น้ำน้อย</td><td>4.50</td><td>61.50</td><td>409.33</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>8</td><td>VKD08</td><td>สะพานมิตรภาพชุมพล</td><td>1.88</td><td>96.35</td><td>42.25</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>9</td><td>VKD09</td><td>วัดหินแท่น (K.62)</td><td>2.53</td><td>51.53</td><td>-</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>10</td><td>SND02</td><td>บ้านหนองบัว (K.35A)</td><td>3.85</td><td>26.67</td><td>382.24</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>11</td><td>SND03</td><td>วัดไชยชุมพลชนะสงคราม (วัดใต้)</td><td>3.00</td><td>24.20</td><td>N/A</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>12</td><td>SND04</td><td>เขื่อนแม่กลอง</td><td>1.62</td><td>22.76</td><td>N/A</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>13</td><td>SND05</td><td>วัดหนองปรือ</td><td>4.95</td><td>130.87</td><td>86.75</td><td>30-09-2569 11:00:00</td><td>-</td></tr><tr><td>14</td><td>SND06</td><td>โรงเรียนบ้านทุ่งนานางหรอก</td><td>7.06</td><td>47.06</td><td>-</td><td>30-09-2569 11:00:00</td><td>160.00</td></tr>			
+	   </tbody>
+		
+		
+	</table>
+
+
+<!-- RID Tele -->
+	</br>
+<table class="w3-table-all w3-centered table-hover">
+		<thead><tr class="w3-Green">
+			<th ><center>ลำดับที่</center></th > 
+			<th ><center>รหัสสถานี</center></th>
+			<th ><center>ชื่อสถานี</center></th>
+			<th ><center>ระดับน้ำ(ม.)</center></th>
+			<th ><center>ระดับน้ำ(ม. รทก.)</center></th>
+			<th ><center>ปริมาณ(ลบ.ม/วินาที)</center></th>
+			<th ><center>ณ วัน-เดือน-ปี : เวลา</center></th>
+			<th ><center>ความจุลำน้ำ (ลบ.ม./วินาที)</center></th>
+		</tr></thead>
+	<tbody>
+			 <tr><td>1</td><td>K.10</td><td>บ้านลุ่มสุ่ม อ.ไทรโยค จ.กาญจนบุรี</td><td>14.71</td><td>45.11</td><td>-</td><td>30-09-2569 10:00:00</td><td>1,039.23</td></tr><tr><td>2</td><td>K.11A</td><td>บ้านวังขนาย อ.ท่าม่วง จ.กาญจนบุรี</td><td>8.85</td><td>18.55</td><td>-</td><td>30-09-2569 10:00:00</td><td>1,495.00</td></tr><tr><td>3</td><td>K.12</td><td>บ้านทุ่งนานางหรอก อ.เมืองกาญจนบุรี จ.กาญจนบุรี</td><td>6.62</td><td>46.32</td><td>-</td><td>30-09-2569 10:00:00</td><td>160.00</td></tr><tr><td>4</td><td>K.17</td><td>บ้านบ่อ อ.สวนผึ้ง จ.ราชบุรี</td><td>-97.24</td><td>0.26</td><td>-</td><td>18-10-2567 18:00:00</td><td>-</td></tr><tr><td>5</td><td>K.31</td><td>บ้านน้ำโจน อ.ไทรโยค จ.กาญจนบุรี</td><td>6.34</td><td>60.54</td><td>189.60</td><td>30-09-2569 10:00:00</td><td>-</td></tr><tr><td>6</td><td>K.32A</td><td>บ้านบ้องตี้ อ.ไทรโยค จ.กาญจนบุรี</td><td>5.29</td><td>89.49</td><td>-</td><td>27-09-2569 10:00:00</td><td>-</td></tr><tr><td>7</td><td>K.35A</td><td>บ้านหนองบัว อ.เมืองกาญจนบุรี จ.กาญจนบุรี</td><td>5.19</td><td>26.69</td><td>385.30</td><td>30-09-2569 10:00:00</td><td>-</td></tr><tr><td>8</td><td>K.37</td><td>บ้านวังเย็น อ.ด่านมะขามเตี้ย จ.กาญจนบุรี</td><td>11.97</td><td>31.77</td><td>1,996.98</td><td>30-09-2569 10:00:00</td><td>1,955.00</td></tr><tr><td>9</td><td>K.3A</td><td>บ้านลุ่ม อ.เมืองกาญจนบุรี จ.กาญจนบุรี</td><td>9.33</td><td>23.33</td><td>-</td><td>30-09-2569 10:00:00</td><td>-</td></tr><tr><td>10</td><td>K.54</td><td>สะพานรถยนต์บ้านลิ่นถิ่น อ.ทองผาภูมิ จ.กาญจนบุรี</td><td>6.16</td><td>66.76</td><td>749.84</td><td>30-09-2569 10:00:00</td><td>970.00</td></tr><tr><td>11</td><td>K.58</td><td>บ้านปากแซง อ.ไทรโยค จ.กาญจนบุรี</td><td>12.25</td><td>51.75</td><td>-</td><td>30-09-2569 10:00:00</td><td>-</td></tr><tr><td>12</td><td>K.62</td><td>บ้านหนองไผ่ อ.ด่านมะขามเตี้ย จ.กาญจนบุรี</td><td>2.27</td><td>51.27</td><td>-</td><td>30-09-2569 10:00:00</td><td>-</td></tr>			
+	   </tbody>
+
+</table>
+</br>
+</div>
+
+
+	</div>
+	</div>
+</body>
+</html>
+<!--
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>แผนผังน้ำระบบโทรมาตร</title>
+	<link rel="stylesheet" href="css/teleDamMap.css">
+</head>
+
+<body>
+	
+	
+	<div style="position:absolute; top:10; left:10; z-index:2">
+			
+	<div style="position:absolute; top:240; left:10; z-index:1">
+		
+		<img src="tele_mk_anni.php">
+	</div>
+	<div style="position:absolute; top:240; left:10; z-index:0">
+		<img src="images/MK_22012562-annimation.gif" >
+	</div>
+	</div>
+	
+</body>
+</html>
+-->
