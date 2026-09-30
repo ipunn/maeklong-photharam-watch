@@ -7,12 +7,16 @@
   const STALE_MINUTES = 6 * 60;
   const STALE_TEXT = "ข้อมูลอาจไม่อัพเดทล่าสุด";
 
+  // A level the page marks on a gauge's chart so people can see how far the water is from it. The
+  // maintainer's own line (Photharam: 6.00 m), NOT an official threshold, and never a Status.
+  const REFERENCE_NOTE = "เส้นอ้างอิงที่ตั้งไว้ในเว็บนี้ ไม่ใช่เกณฑ์ทางการ";
+
   // Upstream first, so the cards read top-to-bottom as the water flows down to the user.
-    const STATIONS = [
+  const STATIONS = [
     { file: "data/pak-saeng.json", name: "บ้านปากแซง", role: "", staleMinutes: STALE_MINUTES },
     { file: "data/wang-khanai.json", name: "บ้านวังขนาย", role: "ท้ายเขื่อนแม่กลอง", staleMinutes: STALE_MINUTES },
     { file: "data/khai-luang.json", name: "สะพานค่ายหลวง", role: "", staleMinutes: STALE_MINUTES },
-    { file: "data/photharam.json", name: "โพธาราม", role: "", staleMinutes: STALE_MINUTES },
+    { file: "data/photharam.json", name: "โพธาราม", role: "", staleMinutes: STALE_MINUTES, reference: { v: 6, note: REFERENCE_NOTE } },
   ];
 
   // One fetch per history file, shared by the river-line overview and the cards.
@@ -72,9 +76,6 @@
     return new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ms) + " น.";
   }
 
-  // A date-change label on a 24 h axis (Bangkok midnight), e.g. "30 ก.ย."
-  const dayLabel = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
-
   const STATUS_LABEL = {
     red: "วิกฤต",
     yellow: "เฝ้าระวัง",
@@ -99,7 +100,15 @@
     return `<span class="station-name">${name}${role ? ` <span class="station-role">${role}</span>` : ""}</span>`;
   }
 
-  async function loadStation({ file, name, role, staleMinutes }) {
+  // How far a level is from the page's reference line, as a fact (never a Status). Empty without one.
+  function referenceHtml(levelMsl, reference, cls) {
+    const c = reference && bankComparison(levelMsl, reference.v);
+    if (!c) return "";
+    const rel = c.direction === "at" ? "เท่ากับเส้นอ้างอิง" : `${c.direction === "above" ? "สูงกว่า" : "ต่ำกว่า"}เส้นอ้างอิง ${c.diffM.toFixed(2)} ม.`;
+    return `<div class="${cls}">เส้นอ้างอิง ${reference.v.toFixed(2)} ม.รทก. · ระดับปัจจุบัน${rel} <span class="unit">(${reference.note})</span></div>`;
+  }
+
+  async function loadStation({ file, name, role, staleMinutes, reference }) {
     const history = await getHistory(file);
     const latest = history[history.length - 1];
 
@@ -129,7 +138,8 @@
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
       <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
-      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, windowH, true)}
+      ${referenceHtml(latest.levelMsl, reference, "station-meta")}
+      ${sparklineHtml(history, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, false, reference)}
     `;
     return card;
   }
@@ -319,58 +329,22 @@
     return `<div class="spark"><div class="spark-label">${label}</div><div class="bars" role="img" aria-label="${label}">${cols}</div></div>`;
   }
 
-  // Small trend chart: x is real time (not index), only distinct source timestamps,
-  // last 24 h. Caption prints the real span and first -> last so it can't overstate.
-  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false) {
+  // Small trend chart for a Window: x is real time, the vertical scale and any gap are drawn by the
+  // shared renderer (chart.js). Caption prints the real span and first -> last so it can't overstate.
+  // `reference` ({ v, note }) draws a dashed line at a level the page marks (see STATIONS).
+  function sparklineHtml(rows, valueKey, timeKey, label, unit, digits, minRange, windowHours = 24, hourlyAxis = false, compact = false, reference = null) {
     const all = seriesOf(rows, valueKey, timeKey);
     const shared = hourlyAxis && axisEndT != null;
     const latestT = all.length ? all[all.length - 1].t : 0;
     const endT = shared ? axisEndT : latestT;
-    const startT = shared ? endT - windowHours * 3600000 : null;
-    const pts = all.filter((p) => (shared ? p.t >= startT && p.t <= endT : p.t >= latestT - windowHours * 3600000));
+    const startT = endT - windowHours * 3600000;
+    const pts = all.filter((p) => p.t >= startT && p.t <= endT);
     if (pts.length < (shared ? 1 : 2)) {
       return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
     }
-    const w = 300;
-    const h = 56;
-    const pad = 6;
-    const t0 = shared ? startT : pts[0].t;
-    const tN = shared ? endT : pts[pts.length - 1].t;
-    const vs = pts.map((p) => p.v);
-    // Never auto-zoom below a meaningful range, or a 1 cm wiggle looks like a collapse.
-    let min = Math.min(...vs);
-    let max = Math.max(...vs);
-    if (max - min < minRange) {
-      const mid = (min + max) / 2;
-      min = mid - minRange / 2;
-      max = mid + minRange / 2;
-    }
-    const range = max - min;
-    const xy = pts.map((p) => [
-      pad + ((p.t - t0) / (tN - t0)) * (w - pad * 2),
-      h - pad - ((p.v - min) / range) * (h - pad * 2),
-    ]);
-    const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-    const [ex, ey] = xy[xy.length - 1];
+    const chart = renderChart({ points: all, startT, endT, windowH: windowHours, minRange, digits, unit, ariaLabel: label, reference });
     const spanH = (pts[pts.length - 1].t - pts[0].t) / 3600000;
-    // Hourly ticker: one tick per whole hour (Bangkok is UTC+7, a whole-hour offset).
-    // Only for short windows; labels are HTML so the stretched svg cannot distort them.
-    const ticks = hourlyAxis
-      ? axisTicks(t0, tN, windowHours).map((k) => ({ ...k, x: pad + ((k.t - t0) / (tN - t0)) * (w - pad * 2) }))
-      : [];
-    const grid = ticks.map((k) => `<line class="spark-grid"${k.midnight ? " data-midnight" : ""} x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
-    const axis = ticks.length
-      ? `<div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${ticks
-          .map((k) => `<span class="tick"${k.midnight ? " data-midnight" : ""} style="left:${((k.x / w) * 100).toFixed(2)}%">${k.midnight ? dayLabel(k.t) : `${String(k.hour).padStart(2, "0")}:00`}</span>`)
-          .join("")}</div>`
-      : "";
-    // Less history than the Window: say how much there is, never redraw to a different size.
-    const haveH = shared ? (endT - all[0].t) / 3600000 : 0;
-    const cover = shared && haveH < windowHours - 0.5 ? `<div class="spark-cover">มีข้อมูลเพียง ${Math.round(haveH)} ชม.</div>` : "";
-    return `<div class="spark">${compact ? "" : `<div class="spark-label">${label}</div>`}
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${label}">
-        ${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" />
-      </svg>${axis}${cover}
+    return `<div class="spark">${compact ? "" : `<div class="spark-label">${label}</div>`}${chart}
       ${compact ? "" : `<div class="spark-cap">${spanH > 48 ? `${(spanH / 24).toFixed(1)} วัน` : `${spanH.toFixed(1)} ชม.`}: ${pts[0].v.toFixed(digits)} → ${pts[pts.length - 1].v.toFixed(digits)} ${unit}</div>`}</div>`;
   }
 
@@ -435,17 +409,18 @@
     const qNote = q && (q.updatedAt !== d.latest.updatedAt || d.qStale)
       ? `<div class="flow-meta" data-stale="${d.qStale}">อัตราการไหลข้อมูล ณ ${formatShortTime(q.updatedAt)}${d.qStale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</div>` : "";
     const flowValue = q
-      ? `<div class="flow-group"><div class="flow-value"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ≈ ${fmtM3s(q.dischargeM3s)} <span class="unit">ลบ.ม./วินาที</span></div>
+      ? `<div class="flow-group"><div class="flow-value flow-q"><span class="flow-label">อัตราการไหลของแม่น้ำ</span> ≈ ${fmtM3s(q.dischargeM3s)} <span class="unit">ลบ.ม./วินาที</span></div>
          ${d.dischargeTrend ? `<div class="flow-meta">${trendHtml(d.dischargeTrend, "discharge")}</div>` : ""}${d.qStale ? "" : capacityHtml(node.station, q.dischargeM3s)}${qNote}</div>`
       : "";
     return `<li class="${cls}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">${node.kind === "barrage" ? "ระดับน้ำที่เขื่อน" : "ระดับผิวน้ำ"}</span> ${d.latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
       ${flowValue}
+      ${node.kind === "gauge" && node.station.reference ? `<div class="flow-group">${referenceHtml(d.latest.levelMsl, node.station.reference, "flow-meta")}</div>` : ""}
       ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "gauge")}</div></div>` : ""}
       <div class="flow-group">${freshnessHtml(d)}</div>
       ${remarks.length ? `<div class="flow-remark">${remarks.join("<br>")}</div>` : ""}</div>
-      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.", 2, 0.1, windowH, true, true)}</div></div></li>`;
+      <div class="flow-sparks">${sparklineHtml(d.rows, "levelMsl", "updatedAt", "ระดับผิวน้ำ", "ม.รทก.", 2, 0.1, windowH, true, true, node.station && node.station.reference)}</div></div></li>`;
   }
 
   async function nodeData(node) {

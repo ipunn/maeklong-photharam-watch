@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -734,4 +734,82 @@ test("bangkokDate: the Bangkok calendar day of a moment, N days back, across the
   assert.equal(bangkokDate(Date.parse("2026-09-30T17:00:00Z"), 0), "2026-10-01");
   assert.equal(bangkokDate(Date.parse("2026-09-30T04:47:00Z"), 1), "2026-09-29");
   assert.equal(bangkokDate(Date.parse("2026-03-01T03:00:00Z"), 1), "2026-02-28");
+});
+
+// ---- chartModel: everything a small time-series chart draws, as numbers (x 0..1 across the axis, y 0..1 top to bottom) ----
+// BKK003's real history captured 2026-09-30 (fixtures/): the source reported nothing between 08:30 and 18:40.
+const bkkRecent = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "bkk003-recent-2026-09-30.json"), "utf8")).map((p) => ({ t: Date.parse(p.t), v: p.v }));
+const bkkEnd = Date.parse("2026-09-30T21:00:00+07:00"); // the shared right edge: newest data hour, rounded up
+
+test("chartModel: a 12 h Window over a 10 h outage shows one line and one honest gap, not a line across it", () => {
+  const m = chartModel(bkkRecent, { startT: bkkEnd - 12 * 3600000, endT: bkkEnd, minRange: 0.1 });
+  assert.equal(m.segments.length, 1);
+  assert.equal(m.segments[0].length, 6); // 18:40, 19:10, 19:20, 20:00, 20:10, 20:30
+  assert.equal(m.gaps.length, 1);
+  assert.ok(Math.abs(m.gaps[0].hours - (9 + 40 / 60)) < 1e-9); // 09:00 -> 18:40
+  assert.equal(m.gaps[0].x0, 0);
+  assert.ok(Math.abs(m.missingHours - (9 + 40 / 60)) < 1e-9);
+});
+
+test("chartModel: a 24 h Window breaks the line at the outage, and a 1 h 40 min pause is not a gap", () => {
+  const m = chartModel(bkkRecent, { startT: bkkEnd - 24 * 3600000, endT: bkkEnd, minRange: 0.1 });
+  assert.equal(m.segments.length, 2); // 04:30 -> 06:10 (1 h 40) stays joined; 08:30 -> 18:40 splits
+  assert.equal(m.gaps.length, 1);
+  assert.ok(Math.abs(m.gaps[0].hours - (10 + 10 / 60)) < 1e-9); // 08:30 -> 18:40
+  assert.ok(Math.abs(m.segments[1][0].x - (21 + 40 / 60) / 24) < 1e-9); // 18:40 is 21 h 40 min after 21:00 the day before
+});
+
+test("chartModel: the vertical scale is the data's own min and max, labelled, larger values higher", () => {
+  const m = chartModel(bkkRecent, { startT: bkkEnd - 12 * 3600000, endT: bkkEnd, minRange: 0.1 });
+  assert.deepEqual(m.yLabels.map((l) => l.v), [2.21, 1.99]); // max, min
+  assert.ok(m.yLabels[0].y < m.yLabels[1].y);
+  assert.equal(m.min, 1.99);
+  assert.equal(m.max, 2.21);
+  assert.equal(m.last.x < 1 && m.last.x > 0.9, true); // newest reading sits just left of the 21:00 edge
+});
+
+test("chartModel: a reference level is always inside the scale, so the distance to it is visible", () => {
+  // Photharam's level 2026-09-30 (5.52-5.61 m) against a 6.00 m reference: without it the chart would zoom on 9 cm.
+  const pts = [5.52, 5.55, 5.57, 5.61].map((v, i) => ({ t: 1000 + i * 3600000, v }));
+  const m = chartModel(pts, { startT: 1000, endT: 1000 + 6 * 3600000, minRange: 0.1, reference: { v: 6 } });
+  assert.equal(m.max, 6);
+  assert.equal(m.min, 5.52);
+  assert.equal(m.reference.y, 0.1); // the top of the plot, where the scale ends
+  assert.deepEqual(m.yLabels.map((l) => l.v), [6, 5.52]); // one label for 6.00, not two
+  assert.ok(m.last.y > m.reference.y); // the current level is below the reference line
+});
+
+test("chartModel: a flat series is not stretched into a dramatic line, and nothing in the Window gives null", () => {
+  const flat = [0, 1, 2].map((i) => ({ t: 1000 + i * 3600000, v: 2 }));
+  const m = chartModel(flat, { startT: 1000, endT: 1000 + 3 * 3600000, minRange: 0.1 });
+  assert.ok(Math.abs(m.max - m.min - 0.1) < 1e-9);
+  assert.equal(chartModel(bkkRecent, { startT: 0, endT: 1000, minRange: 0.1 }), null);
+  assert.equal(chartModel([], { startT: 0, endT: 1000, minRange: 0.1 }), null);
+});
+
+test("chartModel: a gauge whose newest reading is old stops short of the edge and says so", () => {
+  const pts = [{ t: 1000, v: 1 }, { t: 1000 + 3600000, v: 1.1 }];
+  const m = chartModel(pts, { startT: 1000, endT: 1000 + 8 * 3600000, minRange: 0.1 });
+  assert.equal(m.gaps.length, 1); // 1 h -> 8 h with nothing after the last reading
+  assert.ok(Math.abs(m.gaps[0].hours - 7) < 1e-9);
+  assert.ok(m.last.x < 0.2);
+});
+
+test("chartModel: flat data with no minimum range still gives a finite chart, never NaN", () => {
+  const flat = [0, 1].map((i) => ({ t: 1000 + i * 3600000, v: 2 }));
+  const m = chartModel(flat, { startT: 1000, endT: 1000 + 2 * 3600000, minRange: 0 });
+  assert.ok(Number.isFinite(m.last.y));
+  assert.ok(m.segments[0].every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)));
+});
+
+test("chartModel: an axis that does not run forward has nothing to draw", () => {
+  assert.equal(chartModel([{ t: 1000, v: 1 }], { startT: 1000, endT: 1000, minRange: 0.1 }), null);
+  assert.equal(chartModel([{ t: 1000, v: 1 }], { startT: 2000, endT: 1000, minRange: 0.1 }), null);
+});
+
+test("chartModel: a reference near, but not at, the top of the scale keeps the scale's own maximum labelled", () => {
+  // Level 5.00-6.00 against a 5.95 reference: 6.00 is still the scale's top and must not vanish.
+  const pts = [5, 5.5, 6].map((v, i) => ({ t: 1000 + i * 3600000, v }));
+  const m = chartModel(pts, { startT: 1000, endT: 1000 + 3 * 3600000, minRange: 0.1, reference: { v: 5.95 } });
+  assert.deepEqual(m.yLabels.map((l) => l.v), [6, 5.95, 5]);
 });

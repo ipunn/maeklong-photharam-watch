@@ -6,7 +6,9 @@
 
 **Proxy gauge** — a Gauge that is near a Site but not on the waterway that threatens it. คลองบางค้อ has no gauge of its own, so the Bang Kruai Site shows only proxy gauges (e.g. BKK003 on คลองมหาสวัสดิ์, Chao Phraya gauges), each labelled with its relation to the area, side by side with no headline, under a fixed note that the canal itself is not measured.
 
-**Window** — the span of time, ending at the newest data hour, that every hourly chart and trend line covers: 6, 12 or 24 h, one choice for the whole page, default 6 h. Boxes share the same right edge, so the same x means the same clock time everywhere. A box with less data than the Window shows what it has and says how much that is; it is never redrawn to a different size. Daily boxes (EGAT storage bars, Tide high/low), the headline and the Site alert do not follow the Window.
+**Window** — the span of time, ending at the newest data hour, that every hourly chart and trend line covers: 6, 12 or 24 h, one choice for the whole page, default 6 h. Boxes share the same right edge, so the same x means the same clock time everywhere. A box with hours of no data inside the Window shows them as a named gap and breaks its line there; it is never redrawn to a different size and never draws across the gap. Daily boxes (EGAT storage bars, Tide high/low), the headline and the Site alert do not follow the Window.
+
+**Reference line** — a level the maintainer marks on a Gauge's chart so people can see how far the water is from it (โพธาราม: 6.00 m above sea level). The page's own line, not an official threshold and never a Status; it is always labelled as such.
 
 **Tide** — the twice-daily rise and fall of a tidal Gauge (Chao Phraya and its canals, unlike Mae Klong). A rising/falling trend is not meaningful there; the page shows each day's high and low instead.
 

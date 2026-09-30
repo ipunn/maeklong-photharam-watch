@@ -110,32 +110,16 @@
       .join("");
   }
 
-  // Same chart as the Mae Klong page: the Window (6 / 12 / 24 h, from the toggle), one shared
-  // right edge (the newest data hour across all gauges) so the same x means the same clock time
-  // in every box, and a ticker. A gauge whose newest reading is older stops short of the edge.
+  // Same chart as the Mae Klong page (chart.js): the Window (6 / 12 / 24 h, from the toggle), one shared
+  // right edge (the newest data hour across all gauges) so the same x means the same clock time in
+  // every box. A gauge whose newest reading is older stops short of the edge, and hours with no reading
+  // are shaded and named rather than left blank.
   let windowH = WindowToggle.current();
   const HOUR = 3600000;
-  const dayLabelAt = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
   function chartHtml(recent, endT) {
-    const startT = endT - windowH * HOUR;
-    const pts = recent.map((p) => ({ t: new Date(p.t).getTime(), v: p.v })).filter((p) => p.t >= startT && p.t <= endT);
-    if (!pts.length) return `<div class="spark"><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
-    const w = 300, h = 56, pad = 6, minRange = 0.1;
-    let min = Math.min(...pts.map((p) => p.v)), max = Math.max(...pts.map((p) => p.v));
-    if (max - min < minRange) { const mid = (min + max) / 2; min = mid - minRange / 2; max = mid + minRange / 2; }
-    const xy = pts.map((p) => [pad + ((p.t - startT) / (endT - startT)) * (w - pad * 2), h - pad - ((p.v - min) / (max - min)) * (h - pad * 2)]);
-    const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-    const [ex, ey] = xy[xy.length - 1];
-    const ticks = axisTicks(startT, endT, windowH).map((k) => ({ ...k, x: pad + ((k.t - startT) / (endT - startT)) * (w - pad * 2) }));
-    const grid = ticks.map((k) => `<line class="spark-grid"${k.midnight ? " data-midnight" : ""} x1="${k.x.toFixed(1)}" y1="0" x2="${k.x.toFixed(1)}" y2="${h}" />`).join("");
-    const axis = `<div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${ticks
-      .map((k) => `<span class="tick"${k.midnight ? " data-midnight" : ""} style="left:${((k.x / w) * 100).toFixed(2)}%">${k.midnight ? dayLabelAt(k.t) : `${String(k.hour).padStart(2, "0")}:00`}</span>`)
-      .join("")}</div>`;
-    // Less history than the Window: say how much there is, never redraw to a different size.
-    const haveH = (endT - new Date(recent[0].t).getTime()) / HOUR;
-    const cover = haveH < windowH - 0.5 ? `<div class="spark-cover">มีข้อมูลเพียง ${Math.round(haveH)} ชม.</div>` : "";
-    return `<div class="spark">
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="ระดับผิวน้ำ ${windowH} ชั่วโมงที่ผ่านมา">${grid}<polyline class="spark-line" points="${line}" /><path class="spark-dot" d="M${ex.toFixed(1)} ${ey.toFixed(1)}h0" /></svg>${axis}${cover}</div>`;
+    const points = recent.map((p) => ({ t: new Date(p.t).getTime(), v: p.v }));
+    const chart = renderChart({ points, startT: endT - windowH * HOUR, endT, windowH, minRange: 0.1, digits: 2, unit: "ม.รทก.", ariaLabel: `ระดับผิวน้ำ ${windowH} ชั่วโมงที่ผ่านมา` });
+    return chart ? `<div class="spark">${chart}</div>` : `<div class="spark"><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
   }
 
   function trendHtml(recent) {

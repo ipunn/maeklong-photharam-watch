@@ -417,6 +417,75 @@ function bangkokDate(ms, daysAgo) {
   return new Date(ms + 7 * 3600000 - daysAgo * 86400000).toISOString().slice(0, 10);
 }
 
+// Everything a small time-series chart draws, as numbers, so both pages draw the same thing.
+// x is 0..1 across [startT, endT]; y is 0..1 from the TOP (larger values higher). `points` are
+// { t: ms, v } and only those inside the Window count. The vertical scale is the data's own min and
+// max (labelled by the caller), widened to `minRange` so a 1 cm wiggle does not look like a collapse,
+// and widened again to include `reference.v` (a level the page marks) so the distance to it shows.
+// A stretch longer than `maxStepMs` between readings is a GAP: the line breaks there instead of a
+// straight line crossing hours nobody measured, and the gap is reported (leading, internal or trailing).
+// Null when no point is in the Window.
+const CHART_PAD_Y = 0.1;
+const CHART_SAME_LEVEL_Y = 0.03; // two levels closer than this (as a fraction of the plot height) are the same line
+
+function chartModel(points, { startT, endT, minRange = 0, reference = null, maxStepMs = 2 * 3600000 }) {
+  if (!(endT > startT)) return null; // an axis that does not run forward has nothing to draw
+  const pts = points
+    .filter((p) => p.t >= startT && p.t <= endT && Number.isFinite(p.v))
+    .sort((a, b) => a.t - b.t);
+  if (!pts.length) return null;
+  const xOf = (t) => (t - startT) / (endT - startT);
+  const hasRef = reference && Number.isFinite(reference.v);
+
+  let min = Math.min(...pts.map((p) => p.v), ...(hasRef ? [reference.v] : []));
+  let max = Math.max(...pts.map((p) => p.v), ...(hasRef ? [reference.v] : []));
+  const range = Math.max(minRange, 1e-6); // never zero: a flat line must not divide by zero
+  if (max - min < range) {
+    const mid = (min + max) / 2;
+    min = mid - range / 2;
+    max = mid + range / 2;
+  }
+  const yOf = (v) => CHART_PAD_Y + (1 - 2 * CHART_PAD_Y) * ((max - v) / (max - min));
+
+  const segments = [];
+  let run = [];
+  pts.forEach((p, i) => {
+    if (i && p.t - pts[i - 1].t > maxStepMs) {
+      segments.push(run);
+      run = [];
+    }
+    run.push({ x: xOf(p.t), y: yOf(p.v) });
+  });
+  segments.push(run);
+
+  const gaps = [];
+  const edges = [startT, ...pts.map((p) => p.t), endT];
+  for (let i = 1; i < edges.length; i++) {
+    if (edges[i] - edges[i - 1] > maxStepMs) {
+      gaps.push({ x0: xOf(edges[i - 1]), x1: xOf(edges[i]), hours: (edges[i] - edges[i - 1]) / 3600000 });
+    }
+  }
+
+  const refPoint = hasRef ? { v: reference.v, y: yOf(reference.v) } : null;
+  // Labels for the scale's two ends; the reference gets its own. An end label is dropped only when it
+  // IS the reference (the reference is the highest or lowest value); one that is merely close stays,
+  // and the renderer spaces the labels apart.
+  const ends = [{ v: max, y: yOf(max) }, { v: min, y: yOf(min) }].filter((l) => !refPoint || Math.abs(l.y - refPoint.y) > CHART_SAME_LEVEL_Y);
+  const yLabels = [...(refPoint ? [refPoint] : []), ...ends].sort((a, b) => a.y - b.y);
+
+  const lastPt = pts[pts.length - 1];
+  return {
+    segments,
+    gaps,
+    missingHours: gaps.reduce((sum, g) => sum + g.hours, 0),
+    min,
+    max,
+    yLabels,
+    reference: refPoint,
+    last: { x: xOf(lastPt.t), y: yOf(lastPt.v) },
+  };
+}
+
 // Where a discharge sits against a Channel capacity, as a fact (never a Status). Null when either
 // figure is missing. The difference is in m3/s, 2 dp, always >= 0.
 function channelCapacityComparison(dischargeM3s, capacityM3s) {
@@ -485,5 +554,5 @@ function parseEgatChannelCapacity(html) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

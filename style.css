@@ -628,7 +628,7 @@ h1 {
 
 /* phones: keep every hourly tick line, but label every second hour when crowded */
 @media (max-width: 480px) {
-  .spark-axis.dense .tick:nth-child(even) {
+  .spark-axis.dense .tick:nth-of-type(even) {
     visibility: hidden;
   }
 }
@@ -1082,4 +1082,87 @@ h1 {
     min-height: 44px;
     padding: 0 16px;
   }
+}
+
+/* chart (chart.js): a labelled vertical scale, shaded gaps, a dashed reference line */
+.spark-plot {
+  margin-left: 2.7rem; /* the left margin carries the scale labels */
+}
+.spark-canvas {
+  position: relative;
+}
+.spark-ylab,
+.spark-yunit {
+  position: absolute;
+  right: calc(100% + 5px);
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.spark-ylab {
+  transform: translateY(-50%);
+}
+.spark-ylab.ref {
+  color: var(--text);
+  font-weight: 700;
+}
+.spark-yunit {
+  top: 0.15rem;
+}
+.spark-hgrid {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.spark-ref {
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+.spark-gap {
+  fill: rgba(180, 83, 9, 0.1);
+}
+.spark-gaplab {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--stale-text);
+  pointer-events: none;
+}
+.spark-dot-small {
+  stroke-width: 5;
+}
+.spark-legend {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.spark-legend-line {
+  display: inline-block;
+  width: 1.4rem;
+  border-top: 2px dashed var(--text);
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* a unit stays on the line with its number ("2,141 ลบ.ม./วินาที" must not split) */
+.flow-value .unit {
+  white-space: nowrap;
+}
+
+/* the river-flow figure is long ("อัตราการไหลของแม่น้ำ ≈ 2,141 ลบ.ม./วินาที"): label above, number and unit together below */
+.flow-q .flow-label {
+  display: block;
+}
+
+.tick.edge {
+  visibility: hidden;
 }
