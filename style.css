@@ -1166,3 +1166,20 @@ h1 {
 .tick.edge {
   visibility: hidden;
 }
+
+/* Photharam's own reference lines (the page's, not official). Yellow, amber, red; each is also named in words. */
+.spark-ref[data-level="yellow"] { stroke: #e0a800; }
+.spark-ref[data-level="amber"] { stroke: #ef6c00; }
+.spark-ref[data-level="red"] { stroke: #d50000; stroke-width: 2.5; }
+.spark-ylab.ref[data-level="yellow"] { color: #9a7400; }
+.spark-ylab.ref[data-level="amber"] { color: #c25400; }
+.spark-ylab.ref[data-level="red"] { color: #d50000; }
+.spark-legend-item { white-space: nowrap; margin-right: 8px; }
+.spark-legend-line[data-level="yellow"] { border-top-color: #e0a800; }
+.spark-legend-line[data-level="amber"] { border-top-color: #ef6c00; }
+.spark-legend-line[data-level="red"] { border-top-color: #d50000; border-top-width: 3px; }
+
+/* with reference lines the chart is taller, so the lines and their labels have room */
+.spark-plot[data-tall] svg {
+  height: 96px;
+}

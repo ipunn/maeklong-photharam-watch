@@ -768,15 +768,15 @@ test("chartModel: the vertical scale is the data's own min and max, labelled, la
   assert.equal(m.last.x < 1 && m.last.x > 0.9, true); // newest reading sits just left of the 21:00 edge
 });
 
-test("chartModel: a reference level is always inside the scale, so the distance to it is visible", () => {
+test("chartModel: reference levels are always inside the scale, so the distance to them is visible", () => {
   // Photharam's level 2026-09-30 (5.52-5.61 m) against a 6.00 m reference: without it the chart would zoom on 9 cm.
   const pts = [5.52, 5.55, 5.57, 5.61].map((v, i) => ({ t: 1000 + i * 3600000, v }));
-  const m = chartModel(pts, { startT: 1000, endT: 1000 + 6 * 3600000, minRange: 0.1, reference: { v: 6 } });
+  const m = chartModel(pts, { startT: 1000, endT: 1000 + 6 * 3600000, minRange: 0.1, references: [{ v: 6 }] });
   assert.equal(m.max, 6);
   assert.equal(m.min, 5.52);
-  assert.equal(m.reference.y, 0.1); // the top of the plot, where the scale ends
+  assert.equal(m.references[0].y, 0.1); // the top of the plot, where the scale ends
   assert.deepEqual(m.yLabels.map((l) => l.v), [6, 5.52]); // one label for 6.00, not two
-  assert.ok(m.last.y > m.reference.y); // the current level is below the reference line
+  assert.ok(m.last.y > m.references[0].y); // the current level is below the reference line
 });
 
 test("chartModel: a flat series is not stretched into a dramatic line, and nothing in the Window gives null", () => {
@@ -810,6 +810,33 @@ test("chartModel: an axis that does not run forward has nothing to draw", () => 
 test("chartModel: a reference near, but not at, the top of the scale keeps the scale's own maximum labelled", () => {
   // Level 5.00-6.00 against a 5.95 reference: 6.00 is still the scale's top and must not vanish.
   const pts = [5, 5.5, 6].map((v, i) => ({ t: 1000 + i * 3600000, v }));
-  const m = chartModel(pts, { startT: 1000, endT: 1000 + 3 * 3600000, minRange: 0.1, reference: { v: 5.95 } });
+  const m = chartModel(pts, { startT: 1000, endT: 1000 + 3 * 3600000, minRange: 0.1, references: [{ v: 5.95 }] });
   assert.deepEqual(m.yLabels.map((l) => l.v), [6, 5.95, 5]);
+});
+
+test("chartModel: three reference levels (6.00, 6.50, 6.75) all sit inside the scale, in order, each labelled once", () => {
+  // Photharam's level was 5.52-5.61 m; the page marks 6.00, 6.50 and 6.75 m. Extra keys (a name, a colour key) ride along.
+  const pts = [5.52, 5.55, 5.57, 5.61].map((v, i) => ({ t: 1000 + i * 3600000, v }));
+  const refs = [{ v: 6, level: "yellow" }, { v: 6.5, level: "amber" }, { v: 6.75, level: "red" }];
+  const m = chartModel(pts, { startT: 1000, endT: 1000 + 6 * 3600000, minRange: 0.1, references: refs });
+  assert.equal(m.max, 6.75);
+  assert.equal(m.min, 5.52);
+  assert.deepEqual(m.references.map((r) => r.level), ["yellow", "amber", "red"]);
+  assert.ok(m.references[2].y < m.references[1].y && m.references[1].y < m.references[0].y); // higher level, higher on the chart
+  assert.deepEqual(m.yLabels.map((l) => l.v), [6.75, 6.5, 6, 5.52]); // the top of the scale IS 6.75, so it is labelled once
+  assert.ok(m.last.y > m.references[0].y); // still below the lowest line
+});
+
+test("chartModel: all three reference lines are on the chart at every Window (6, 12 and 24 h), wherever the data sits", () => {
+  const refs = [{ v: 6, level: "yellow" }, { v: 6.5, level: "amber" }, { v: 6.75, level: "red" }];
+  const end = Date.parse("2026-09-30T21:00:00+07:00");
+  // readings across the last 26 h, the level rising from 5.2 to 5.8 m
+  const pts = Array.from({ length: 105 }, (_, i) => ({ t: end - (26 * 3600000) + i * 15 * 60000, v: 5.2 + (i / 104) * 0.6 }));
+  for (const windowH of [6, 12, 24]) {
+    const m = chartModel(pts, { startT: end - windowH * 3600000, endT: end, minRange: 0.1, references: refs });
+    assert.deepEqual(m.references.map((r) => r.level), ["yellow", "amber", "red"], `${windowH} h`);
+    assert.ok(m.references.every((r) => r.y >= 0.1 - 1e-9 && r.y <= 0.9 + 1e-9), `${windowH} h: every line is inside the plot`);
+    assert.equal(m.max, 6.75, `${windowH} h`);
+    assert.ok(m.last.y > m.references[0].y, `${windowH} h: the level is below the lowest line`);
+  }
 });

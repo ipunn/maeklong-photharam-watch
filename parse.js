@@ -421,24 +421,25 @@ function bangkokDate(ms, daysAgo) {
 // x is 0..1 across [startT, endT]; y is 0..1 from the TOP (larger values higher). `points` are
 // { t: ms, v } and only those inside the Window count. The vertical scale is the data's own min and
 // max (labelled by the caller), widened to `minRange` so a 1 cm wiggle does not look like a collapse,
-// and widened again to include `reference.v` (a level the page marks) so the distance to it shows.
+// and widened again to include every `references[].v` (levels the page marks) so the distance to
+// them shows. Extra keys on a reference (a name, a colour key) are passed through untouched.
 // A stretch longer than `maxStepMs` between readings is a GAP: the line breaks there instead of a
 // straight line crossing hours nobody measured, and the gap is reported (leading, internal or trailing).
 // Null when no point is in the Window.
 const CHART_PAD_Y = 0.1;
 const CHART_SAME_LEVEL_Y = 0.03; // two levels closer than this (as a fraction of the plot height) are the same line
 
-function chartModel(points, { startT, endT, minRange = 0, reference = null, maxStepMs = 2 * 3600000 }) {
+function chartModel(points, { startT, endT, minRange = 0, references = [], maxStepMs = 2 * 3600000 }) {
   if (!(endT > startT)) return null; // an axis that does not run forward has nothing to draw
   const pts = points
     .filter((p) => p.t >= startT && p.t <= endT && Number.isFinite(p.v))
     .sort((a, b) => a.t - b.t);
   if (!pts.length) return null;
   const xOf = (t) => (t - startT) / (endT - startT);
-  const hasRef = reference && Number.isFinite(reference.v);
+  const refVals = references.filter((r) => Number.isFinite(r.v)).map((r) => r.v);
 
-  let min = Math.min(...pts.map((p) => p.v), ...(hasRef ? [reference.v] : []));
-  let max = Math.max(...pts.map((p) => p.v), ...(hasRef ? [reference.v] : []));
+  let min = Math.min(...pts.map((p) => p.v), ...refVals);
+  let max = Math.max(...pts.map((p) => p.v), ...refVals);
   const range = Math.max(minRange, 1e-6); // never zero: a flat line must not divide by zero
   if (max - min < range) {
     const mid = (min + max) / 2;
@@ -466,12 +467,12 @@ function chartModel(points, { startT, endT, minRange = 0, reference = null, maxS
     }
   }
 
-  const refPoint = hasRef ? { v: reference.v, y: yOf(reference.v) } : null;
-  // Labels for the scale's two ends; the reference gets its own. An end label is dropped only when it
-  // IS the reference (the reference is the highest or lowest value); one that is merely close stays,
-  // and the renderer spaces the labels apart.
-  const ends = [{ v: max, y: yOf(max) }, { v: min, y: yOf(min) }].filter((l) => !refPoint || Math.abs(l.y - refPoint.y) > CHART_SAME_LEVEL_Y);
-  const yLabels = [...(refPoint ? [refPoint] : []), ...ends].sort((a, b) => a.y - b.y);
+  const refPoints = references.filter((r) => Number.isFinite(r.v)).map((r) => ({ ...r, y: yOf(r.v) }));
+  // Labels for the scale's two ends; each reference gets its own. An end label is dropped only when it
+  // IS a reference (a reference is the highest or lowest value); one that is merely close stays, and
+  // the renderer spaces the labels apart.
+  const ends = [{ v: max, y: yOf(max) }, { v: min, y: yOf(min) }].filter((l) => !refPoints.some((r) => Math.abs(l.y - r.y) <= CHART_SAME_LEVEL_Y));
+  const yLabels = [...refPoints, ...ends].sort((a, b) => a.y - b.y);
 
   const lastPt = pts[pts.length - 1];
   return {
@@ -481,7 +482,7 @@ function chartModel(points, { startT, endT, minRange = 0, reference = null, maxS
     min,
     max,
     yLabels,
-    reference: refPoint,
+    references: refPoints,
     last: { x: xOf(lastPt.t), y: yOf(lastPt.v) },
   };
 }

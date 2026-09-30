@@ -33,14 +33,16 @@
   const dayLabel = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
 
   // opts: { points: [{t, v}], startT, endT, windowH, minRange, digits, unit, ariaLabel,
-  //         reference: { v, note } | null, maxStepMs }
+  //         references: [{ v, level, name }], referenceNote, maxStepMs }
+  // `level` picks the line's colour (CSS: data-level); `name` is its colour in words, so the meaning
+  // never rests on colour alone.
   // Returns "" when nothing falls inside the Window, so the caller can show its own empty message.
   function renderChart(opts) {
     const m = chartModel(opts.points, {
       startT: opts.startT,
       endT: opts.endT,
       minRange: opts.minRange,
-      reference: opts.reference,
+      references: opts.references || [],
       maxStepMs: opts.maxStepMs,
     });
     if (!m) return "";
@@ -52,8 +54,8 @@
       .map((k) => `<line class="spark-grid"${k.midnight ? " data-midnight" : ""} x1="${px(k.frac).toFixed(1)}" y1="0" x2="${px(k.frac).toFixed(1)}" y2="${H}" />`)
       .join("");
     // the reference has its own dashed line, so it gets no plain gridline underneath
-    const hGrid = m.yLabels.filter((l) => l !== m.reference).map((l) => `<line class="spark-hgrid" x1="0" y1="${(l.y * H).toFixed(1)}" x2="${W}" y2="${(l.y * H).toFixed(1)}" />`).join("");
-    const refLine = m.reference ? `<line class="spark-ref" x1="0" y1="${(m.reference.y * H).toFixed(1)}" x2="${W}" y2="${(m.reference.y * H).toFixed(1)}" />` : "";
+    const hGrid = m.yLabels.filter((l) => !m.references.includes(l)).map((l) => `<line class="spark-hgrid" x1="0" y1="${(l.y * H).toFixed(1)}" x2="${W}" y2="${(l.y * H).toFixed(1)}" />`).join("");
+    const refLines = m.references.map((r) => `<line class="spark-ref" data-level="${r.level || ""}" x1="0" y1="${(r.y * H).toFixed(1)}" x2="${W}" y2="${(r.y * H).toFixed(1)}" />`).join("");
     const gapRects = m.gaps.map((g) => `<rect class="spark-gap" x="${px(g.x0).toFixed(1)}" y="0" width="${(px(g.x1) - px(g.x0)).toFixed(1)}" height="${H}" />`).join("");
     const lines = m.segments
       .map((seg) =>
@@ -67,7 +69,7 @@
     const lastDot = `<path class="spark-dot" d="M${px(m.last.x).toFixed(1)} ${(m.last.y * H).toFixed(1)}h0" />`;
 
     const yLabels = spaceLabels(m.yLabels)
-      .map((l) => `<span class="spark-ylab${m.reference && l.v === m.reference.v ? " ref" : ""}" style="top:${(l.shownY * 100).toFixed(1)}%">${num(l.v)}</span>`)
+      .map((l) => `<span class="spark-ylab${m.references.some((r) => r.v === l.v) ? " ref" : ""}" data-level="${(m.references.find((r) => r.v === l.v) || {}).level || ""}" style="top:${(l.shownY * 100).toFixed(1)}%">${num(l.v)}</span>`)
       .join("");
     const gapLabels = m.gaps
       .filter((g) => g.x1 - g.x0 >= MIN_GAP_LABEL)
@@ -80,13 +82,13 @@
     const unitLabel = opts.unit && opts.unit.length <= 7 ? `<div class="spark-yunit">${opts.unit}</div>` : "";
 
     const cover = m.missingHours >= 1 ? `<div class="spark-cover">ไม่มีข้อมูลในช่วงนี้ ${Math.round(m.missingHours)} ชม.</div>` : "";
-    const legend = m.reference && opts.reference.note
-      ? `<div class="spark-legend"><span class="spark-legend-line"></span>${num(m.reference.v)}${opts.unit ? ` ${opts.unit}` : ""} · ${opts.reference.note}</div>`
+    const legend = m.references.length
+      ? `<div class="spark-legend">${[...m.references].reverse().map((r) => `<span class="spark-legend-item"><span class="spark-legend-line" data-level="${r.level || ""}"></span>${num(r.v)}${r.name ? ` ${r.name}` : ""}</span>`).join(" ")}${opts.unit ? ` ${opts.unit}` : ""}${opts.referenceNote ? ` · ${opts.referenceNote}` : ""}</div>`
       : "";
 
-    return `<div class="spark-plot">
+    return `<div class="spark-plot"${m.references.length ? " data-tall" : ""}>
         <div class="spark-canvas">
-          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${opts.ariaLabel || ""}">${gapRects}${hGrid}${vGrid}${refLine}${lines}${lastDot}</svg>
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${opts.ariaLabel || ""}">${gapRects}${hGrid}${vGrid}${refLines}${lines}${lastDot}</svg>
           ${yLabels}${gapLabels}
         </div>
         <div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${unitLabel}${tickLabels}</div>

@@ -8,7 +8,7 @@
 
 **Window** — the span of time, ending at the newest data hour, that every hourly chart and trend line covers: 6, 12 or 24 h, one choice for the whole page, default 6 h. Boxes share the same right edge, so the same x means the same clock time everywhere. A box with hours of no data inside the Window shows them as a named gap and breaks its line there; it is never redrawn to a different size and never draws across the gap. Daily boxes (EGAT storage bars, Tide high/low), the headline and the Site alert do not follow the Window.
 
-**Reference line** — a level the maintainer marks on a Gauge's chart so people can see how far the water is from it (โพธาราม: 6.00 m above sea level). The page's own line, not an official threshold and never a Status; it is always labelled as such.
+**Reference line** — a level the maintainer marks on a Gauge's chart so people can see how far the water is from it. โพธาราม has three, in metres above sea level: 6.00 (yellow), 6.50 (amber), 6.75 (red). The page's own lines, like the **Site alert**: the colours are a display choice, they are not official thresholds and never a **Status** (which comes only from source-published thresholds), and they are always labelled as the page's own and named in words, not by colour alone.
 
 **Tide** — the twice-daily rise and fall of a tidal Gauge (Chao Phraya and its canals, unlike Mae Klong). A rising/falling trend is not meaningful there; the page shows each day's high and low instead.
 
