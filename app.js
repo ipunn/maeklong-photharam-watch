@@ -657,11 +657,11 @@
   const cmTh = (m) => `${m > 0 ? "+" : m < 0 ? "−" : "±"}${Math.abs(Math.round(m * 100))} ซม.`;
 
   // The level against the bank, as a fact in words (no pill, no colour, no bar).
-  function bankFactHtml(level, bank, unit) {
+  function bankFactHtml(level, bank, unit, onChart = true) {
     const c = bankComparison(level, bank);
     if (!c) return `<div class="flow-meta">ไม่มีข้อมูลความสูงตลิ่ง</div>`;
     const where = c.direction === "at" ? "เท่ากับตลิ่ง" : `${c.direction === "above" ? "สูงกว่า" : "ต่ำกว่า"}ตลิ่ง ${c.diffM.toFixed(2)} ม.`;
-    return `<div class="flow-meta">${where} <span class="unit">(ตลิ่ง ${bank.toFixed(2)} ${unit} · ${BANK_NOTE} · เส้นตลิ่งจะแสดงบนกราฟเมื่อระดับน้ำห่างไม่เกิน ${REFERENCE_PROXIMITY_M.toFixed(2)} ม.)</span></div>`;
+    return `<div class="flow-meta">${where} <span class="unit">(ตลิ่ง ${bank.toFixed(2)} ${unit} · ${BANK_NOTE}${onChart ? ` · เส้นตลิ่งจะแสดงบนกราฟเมื่อระดับน้ำห่างไม่เกิน ${REFERENCE_PROXIMITY_M.toFixed(2)} ม.` : ""})</span></div>`;
   }
 
   function lowerNodeHtml(g, rawRows) {
@@ -716,7 +716,7 @@
     return `<li class="flow-node${stale ? " flow-stale" : ""}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
       <div class="flow-value"><span class="flow-label">ระดับผิวน้ำล่าสุด</span> ${latest.levelMsl.toFixed(2)} <span class="unit">ม. เหนือระดับทะเล</span></div>
-      <div class="flow-group">${bankFactHtml(latest.levelMsl, bank, "ม.รทก.")}</div>
+      <div class="flow-group">${bankFactHtml(latest.levelMsl, bank, "ม.รทก.", false)}</div>
       <div class="flow-group">${range}${lines || `<div class="flow-meta">รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน</div>`}</div>
       <div class="flow-group">${freshnessHtml({ asOf: formatShortTime(latest.updatedAt), mins, stale })}</div>
       <div class="flow-remark">ระดับขึ้น–ลงวันละสองครั้ง จึงไม่แสดงลูกศรสูงขึ้น/ลดลง แต่แสดงสูงสุด–ต่ำสุดของแต่ละวัน (ไม่เปลี่ยนตามช่วงเวลาด้านบน)</div></div></div></li>`;
