@@ -1,0 +1,85 @@
+{
+  "id": 1316598238,
+  "waterlevel_datetime": "2026-10-01 22:40",
+  "waterlevel_m": null,
+  "waterlevel_msl": "0.11",
+  "waterlevel_msl_previous": "0.17",
+  "flow_rate": null,
+  "discharge": null,
+  "storage_percent": "86.43",
+  "sort_order": null,
+  "station_type": "tele_waterlevel",
+  "situation_level": 4,
+  "agency": {
+    "id": 9,
+    "agency_name": {
+      "th": "สถาบันสารสนเทศทรัพยากรน้ำ (องค์การมหาชน)",
+      "en": "Hydro – Informatics Institute (Public Organization)",
+      "jp": ""
+    },
+    "agency_shortname": {
+      "th": "สสน.",
+      "en": "HII",
+      "jp": ""
+    }
+  },
+  "basin": {
+    "id": 15,
+    "basin_code": 14,
+    "basin_name": {
+      "th": "ลุ่มน้ำแม่กลอง",
+      "en": "Mae Klong Basin"
+    }
+  },
+  "station": {
+    "id": 755,
+    "tele_station_name": {
+      "en": "Phra Ram 2",
+      "th": "พระรามสอง"
+    },
+    "tele_station_lat": 13.38362,
+    "tele_station_long": 99.9836,
+    "tele_station_oldcode": "MKG006",
+    "tele_station_type": "tele_waterlevel",
+    "left_bank": 2.017,
+    "right_bank": 1.989,
+    "min_bank": 1.99,
+    "ground_level": -11.86,
+    "offset": null,
+    "sub_basin_id": 276,
+    "agency_id": 9,
+    "geocode_id": 6974,
+    "hydro_id": null,
+    "qmax": null,
+    "is_key_station": false,
+    "warning_level_m": null,
+    "critical_level_m": null,
+    "critical_level_msl": null
+  },
+  "geocode": {
+    "area_code": "2",
+    "area_name": {
+      "th": "ภาคกลาง",
+      "en": "Central"
+    },
+    "amphoe_code": "01",
+    "amphoe_name": {
+      "th": "เมืองสมุทรสงคราม",
+      "en": "Mueang Samut Songkhram District"
+    },
+    "tumbon_code": "01",
+    "tumbon_name": {
+      "th": "แม่กลอง",
+      "en": "Mae Klong"
+    },
+    "province_code": "75",
+    "province_name": {
+      "th": "สมุทรสงคราม",
+      "en": "Samut Songkhram"
+    }
+  },
+  "diff_wl_bank": "1.88",
+  "diff_wl_bank_text": "ต่ำกว่าตลิ่ง (ม.)",
+  "river_gid": 208010,
+  "river_name": "แม่น้ำแม่กลอง"
+}

@@ -343,6 +343,9 @@ const SITES = ["maeklong", "bangkruai"];
 // 2679 K.11A บ้านวังขนาย, 832066 K.55A สะพานค่ายหลวง, 710 โพธาราม.
 const TRACKED_STATIONS = [
   { id: 710, file: "photharam.json", site: "maeklong" },
+  // MKG006 พระรามสอง (อ.เมืองสมุทรสงคราม): the Mae Klong mouth, tidal. In the bulk feed; id re-verified by
+  // name 2026-10-01. Gets the daily high/low summary like the Bang Kruai gauges.
+  { id: 755, file: "mkg006.json", summary: "daily-mkg006.json", site: "maeklong", tidal: true },
   // Bang Kruai Site (proxy gauges; ids re-verified by name against the live feed 2026-09-29).
   // `tidal` is configuration, not inferred: tidal gauges get a daily high/low, not a trend.
   // `summary` is the small per-gauge file the page reads instead of the full 10-minute history.
@@ -368,10 +371,27 @@ const GRAPH_STATIONS = [
   { id: 832066, file: "khai-luang.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.55A สะพานค่ายหลวง: level and discharge
   { id: 700554, file: "barrage-snd04.json", site: "maeklong", graphType: "tele_waterlevel" }, // เขื่อนแม่กลอง (EGAT SND04): the Barrage, level only
   { id: 4007644, file: "k63.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.63 บ้านใหม่, 4.26 km below K.11A: level and discharge
+  // Lower reach, below โพธาราม. Absent from the bulk feed. Their own Source ("lowerReach", the default
+  // is "damArea") so one failing is not hidden behind, or blamed on, the dam gauges. Neither is flagged
+  // tidal: they swing with the tide only at low flow (about 0.1 m now), so they use the ordinary Window trend.
+  { id: 832068, file: "k2b.json", site: "maeklong", graphType: "tele_waterlevel", source: "lowerReach", tidal: false }, // K.2B สะพานธนะรัชต์ (Ratchaburi city); the feed's ground level -10 and bank 4.30 match the research
+  { id: 832069, file: "k57.json", site: "maeklong", graphType: "tele_waterlevel", source: "lowerReach", tidal: false }, // K.57 สะพานบางนกแขวก (RID calls it บ้านกระดังงา); bank 15.50, ground -6.2
 ];
 
 function stationsForSite(site) {
   return TRACKED_STATIONS.filter((s) => s.site === site);
+}
+
+// Every gauge of a Site from both feeds, with the tide flag always present (not flagged = not tidal). The one lookup the pages use to know what belongs to a Site.
+function gaugesForSite(site) {
+  return [...TRACKED_STATIONS, ...GRAPH_STATIONS]
+    .filter((s) => s.site === site)
+    .map((s) => ({ ...s, tidal: s.tidal === true }));
+}
+
+// The graph-fed gauges one Source collects. Unmarked gauges belong to the dam-area Source.
+function graphStationsForSource(source) {
+  return GRAPH_STATIONS.filter((s) => (s.source || "damArea") === source);
 }
 
 // The Window: one span, in hours, for every hourly chart and trend on a page. The URL
@@ -583,6 +603,51 @@ function parseEgatChannelCapacity(html) {
   return out;
 }
 
+// A reading older than this, by the SOURCE's own time, is flagged. An unreadable time is stale: it
+// is never taken as fresh.
+function isStaleReading(updatedAt, nowMs, staleMinutes = 6 * 60) {
+  const t = new Date(updatedAt).getTime();
+  return Number.isNaN(t) || (nowMs - t) / 60000 > staleMinutes;
+}
+
+// The Riverline (see CONTEXT.md): the chain from the Mae Klong Dam to the Gulf. Distances and the two
+// printed travel times are RID's own daily diagram, held here and nowhere else so a revision is one
+// edit. `kmToNext` / `hoursToNext` describe the link to the NEXT stop; `hoursToNext` is set only where
+// RID prints one (two links), never filled in. `file` marks a station we track (its history file);
+// no `file` means "not tracked" (K.56A is RID-API only) or the end. `datum` flags a gauge whose reading
+// is on its own local scale: `zero` is RID's gauge zero, stated, never applied.
+const RIVERLINE = {
+  source: "ผังแสดงสถานการณ์น้ำ ลุ่มน้ำแม่กลอง ศูนย์อุทกวิทยาชลประทานภาคตะวันตก กรมชลประทาน (1 ต.ค. 2569)",
+  totalKm: 123,
+  totalHours: 28,
+  totalSource: "สำนักงานชลประทานที่ 13",
+  stops: [
+    { code: "SND04", name: "เขื่อนแม่กลอง", file: "data/barrage-snd04.json", kmToNext: 1.96, hoursToNext: null },
+    { code: "K.11A", name: "บ้านวังขนาย", file: "data/wang-khanai.json", kmToNext: 4.26, hoursToNext: null },
+    { code: "K.63", name: "บ้านใหม่", file: "data/k63.json", kmToNext: 36.7, hoursToNext: 11 },
+    { code: "K.55A", name: "สะพานค่ายหลวง", file: "data/khai-luang.json", kmToNext: 15.2, hoursToNext: 4 },
+    { code: "K.56A", name: "บ้านสร้อยฟ้า", kmToNext: 23.55, hoursToNext: null },
+    { code: "K.2B", name: "สะพานธนะรัชต์", file: "data/k2b.json", kmToNext: 18.3, hoursToNext: null },
+    { code: "K.57", name: "สะพานบางนกแขวก", file: "data/k57.json", kmToNext: 23, hoursToNext: null, datum: { zero: -13.2, source: "กรมชลประทาน" } },
+    { code: "GULF", name: "อ่าวไทย", kmToNext: null, hoursToNext: null },
+  ],
+};
+
+// The strip, as data for the markup: every stop in order with its link and its latest reading.
+// `readings` maps a stop code to that station's newest history row ({ levelMsl, updatedAt }).
+// state: "reading" | "no-data" (tracked, nothing usable: never 0) | "not-tracked" | "end".
+function riverlineStrip(readings, nowMs, stops = RIVERLINE.stops) {
+  return stops.map((s) => {
+    const base = { code: s.code, name: s.name, kmToNext: s.kmToNext, hoursToNext: s.hoursToNext, datum: s.datum };
+    if (s.code === "GULF") return { ...base, state: "end", levelMsl: null, updatedAt: null, stale: false };
+    if (!s.file) return { ...base, state: "not-tracked", levelMsl: null, updatedAt: null, stale: false };
+    const r = readings[s.code];
+    const ok = r && typeof r.levelMsl === "number" && Number.isFinite(r.levelMsl);
+    if (!ok) return { ...base, state: "no-data", levelMsl: null, updatedAt: null, stale: false };
+    return { ...base, state: "reading", levelMsl: r.levelMsl, updatedAt: r.updatedAt, stale: isStaleReading(r.updatedAt, nowMs) };
+  });
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading, LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

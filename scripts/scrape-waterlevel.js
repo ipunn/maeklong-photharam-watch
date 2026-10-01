@@ -1,4 +1,4 @@
-// Runs on a GitHub Actions cron. Fetches five independent public sources, extracts the
+// Runs on a GitHub Actions cron. Fetches six independent public sources, extracts the
 // tracked river gauges and dams, and appends to per-series history files under data/
 // (an append-only log, never a "latest reading" snapshot — see
 // .scratch/maeklong-photharam-water-monitor/spec.md).
@@ -25,7 +25,7 @@ const {
   parseWaterLevelGraph,
   newGraphRows,
   parseEgatChannelCapacity,
-  GRAPH_STATIONS,
+  graphStationsForSource,
   bangkokDate,
   dailyHighLow,
   seriesOf,
@@ -239,11 +239,14 @@ async function scrapeDamsHourly(scrapedAt) {
   return succeeded(outcomes);
 }
 
-// The Barrage's level and K.63, from the per-station graph feed. One request per station.
-async function scrapeDamArea(scrapedAt) {
+// Stations from the per-station graph feed, one request per station. Each Source (a group of
+// GRAPH_STATIONS) stamps status.json on its own, so one broken station cannot hide behind, or be
+// blamed on, another group's: "damArea" is the Barrage, K.63 and the other dam-area gauges;
+// "lowerReach" is K.2B and K.57 below โพธาราม.
+const scrapeGraphSource = (source) => async function (scrapedAt) {
   const nowMs = new Date(scrapedAt).getTime();
   const outcomes = [];
-  for (const { id, file, graphType } of GRAPH_STATIONS) {
+  for (const { id, file, graphType } of graphStationsForSource(source)) {
     let raw;
     try {
       const url = `${GRAPH_URL}?station_type=${graphType}&station_id=${id}&start_date=${bangkokDate(nowMs, GRAPH_DAYS - 1)}&end_date=${bangkokDate(nowMs, 0)}`;
@@ -269,7 +272,7 @@ async function scrapeDamArea(scrapedAt) {
     );
   }
   return succeeded(outcomes);
-}
+};
 
 // EGAT's Channel capacity for the stations we show. An attribute of a station, not a Reading, so
 // it is a small snapshot (with the page's own time) and not a History. A page whose layout is not
@@ -298,7 +301,8 @@ const SOURCES = {
   river: scrapeRivers,
   reservoir: scrapeReservoirs,
   damHourly: scrapeDamsHourly,
-  damArea: scrapeDamArea,
+  damArea: scrapeGraphSource("damArea"),
+  lowerReach: scrapeGraphSource("lowerReach"),
   egatTelemetry: scrapeEgatTelemetry,
 };
 

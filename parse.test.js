@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -348,8 +348,8 @@ test("isSameReading ignores scrapedAt and compares the source's values", () => {
 });
 
 test("the bulk feed tracks Photharam; the other Mae Klong gauges come from the per-station graph feed", () => {
-  assert.deepEqual(stationsForSite("maeklong").map((s) => s.id), [710]);
-  assert.deepEqual(GRAPH_STATIONS.filter((s) => s.site === "maeklong").map((s) => s.id), [505018, 2571, 2679, 832066, 700554, 4007644]);
+  assert.deepEqual(stationsForSite("maeklong").map((s) => s.id), [710, 755]); // 755 = MKG006 พระรามสอง, the mouth
+  assert.deepEqual(GRAPH_STATIONS.filter((s) => s.site === "maeklong").map((s) => s.id), [505018, 2571, 2679, 832066, 700554, 4007644, 832068, 832069]);
 });
 
 test("stationsForSite returns nothing for an unknown Site — never another Site's gauges", () => {
@@ -942,4 +942,147 @@ test("chartModel: a gap shows only past 3 h, and one running to the right edge i
   const end = chartModel(pts([0, 1, 2]), { startT: 0, endT: 6 * H, minRange: 0.1 }); // stops at 2 h, edge at 6 h
   assert.equal(end.gaps.length, 1);
   assert.equal(end.gaps[0].trailing, true);
+});
+
+// ---- Lower Mae Klong: the Riverline, K.2B, K.57 (graph feed) and MKG006 พระรามสอง (bulk feed, tidal) ----
+// Real captures 2026-10-01 (fixtures/). The graph feed carries no station name, so K.2B and K.57 are
+// checked by the bank and ground level the source reports (the same figures the research verified by name).
+const rawMkg006 = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "thaiwater-waterlevel-record-mkg006.json"), "utf8"));
+
+test("gaugesForSite: the Mae Klong Site has K.2B, K.57 and MKG006; the Bang Kruai Site never gets them", () => {
+  const mk = gaugesForSite("maeklong").map((s) => s.id);
+  for (const id of [832068, 832069, 755]) assert.ok(mk.includes(id), `Mae Klong lacks ${id}`);
+  const bk = gaugesForSite("bangkruai").map((s) => s.id);
+  for (const id of [832068, 832069, 755]) assert.ok(!bk.includes(id), `Bang Kruai has ${id}`);
+  assert.deepEqual(gaugesForSite("nowhere"), []);
+});
+
+test("the tide flag is set for MKG006 and not for K.2B or K.57, in configuration", () => {
+  const byId = new Map(gaugesForSite("maeklong").map((s) => [s.id, s]));
+  assert.equal(byId.get(755).tidal, true);
+  assert.equal(byId.get(832068).tidal, false);
+  assert.equal(byId.get(832069).tidal, false);
+  assert.ok(byId.get(755).summary, "MKG006 needs the small daily high/low file");
+  // the existing Mae Klong gauges are untouched
+  assert.equal(byId.get(710).tidal, false);
+});
+
+test("K.2B and K.57 are collected as a Source of their own, so their failure cannot hide the dam gauges' success", () => {
+  assert.deepEqual(graphStationsForSource("lowerReach").map((s) => s.id), [832068, 832069]);
+  assert.ok(!graphStationsForSource("damArea").some((s) => [832068, 832069].includes(s.id)));
+  assert.deepEqual(graphStationsForSource("damArea").map((s) => s.id), [505018, 2571, 2679, 832066, 700554, 4007644]);
+});
+
+test("parseWaterLevelRecord: MKG006 พระรามสอง from the real bulk record, with its own bank height", () => {
+  const p = parseWaterLevelRecord(rawMkg006);
+  assert.equal(p.stationId, 755);
+  assert.equal(p.name, "พระรามสอง");
+  assert.equal(p.levelMsl, 0.11);
+  assert.equal(p.bankMsl, 1.99);
+  assert.equal(p.updatedAt, "2026-10-01T22:40:00+07:00");
+  assert.equal(p.thresholds, null); // no source-published level, so no Status
+  assert.equal(deriveStatus(p.levelMsl, p.thresholds), null);
+});
+
+test("parseWaterLevelGraph: K.2B and K.57 real series, null hours dropped, bank height from the source", () => {
+  for (const [name, bank, last] of [["k2b", 4.3, 4.21], ["k57", 15.5, 15.12]]) {
+    const g = parseWaterLevelGraph(graphFixture(name));
+    assert.ok(g.rows.length > 40 && g.rows.every((r) => typeof r.levelMsl === "number"), name);
+    assert.ok(Math.abs(g.bankMsl - bank) < 1e-9, name);
+    assert.ok(Math.abs(g.rows[g.rows.length - 1].levelMsl - last) < 1e-9, name);
+    assert.ok(g.rows.every((r) => r.dischargeM3s === null), name); // neither reports a discharge
+  }
+});
+
+test("parseWaterLevelGraph: a non-numeric K.57 level is dropped, never stored as 0", () => {
+  const raw = { data: { min_bank: 15.5, graph_data: [
+    { datetime: "2026-10-01 20:00", value: "", discharge: null },
+    { datetime: "2026-10-01 21:00", value: "n/a", discharge: null },
+    { datetime: "2026-10-01 22:00", value: 15.12, discharge: null },
+  ] } };
+  assert.deepEqual(parseWaterLevelGraph(raw).rows.map((r) => r.levelMsl), [15.12]);
+});
+
+test("newGraphRows: K.57 and K.2B append only hours newer than the last stored one", () => {
+  for (const name of ["k2b", "k57"]) {
+    const { rows } = parseWaterLevelGraph(graphFixture(name));
+    const last = rows[rows.length - 1];
+    const stored = [{ updatedAt: rows[rows.length - 3].updatedAt, levelMsl: 0 }];
+    assert.deepEqual(newGraphRows(stored, rows).map((r) => r.updatedAt), [rows[rows.length - 2].updatedAt, last.updatedAt]);
+    assert.deepEqual(newGraphRows([{ updatedAt: last.updatedAt }], rows), []);
+  }
+});
+
+test("isStaleReading: judged from the source's own time, past 6 hours, and an unreadable time is stale", () => {
+  const now = Date.parse("2026-10-01T18:00:00+07:00");
+  assert.equal(isStaleReading("2026-10-01T12:00:00+07:00", now), false); // exactly 6 h
+  assert.equal(isStaleReading("2026-10-01T11:59:00+07:00", now), true);
+  assert.equal(isStaleReading("2026-10-01T17:50:00+07:00", now), false);
+  assert.equal(isStaleReading(null, now), true);
+  assert.equal(isStaleReading("not a time", now), true);
+});
+
+test("RIVERLINE: the order and spacing are RID's diagram, dam to Gulf, one attributed block", () => {
+  assert.deepEqual(RIVERLINE.stops.map((s) => s.code), ["SND04", "K.11A", "K.63", "K.55A", "K.56A", "K.2B", "K.57", "GULF"]);
+  assert.deepEqual(RIVERLINE.stops.map((s) => s.kmToNext), [1.96, 4.26, 36.7, 15.2, 23.55, 18.3, 23, null]);
+  assert.match(RIVERLINE.source, /ชลประทาน/);
+  assert.match(RIVERLINE.totalSource, /ชลประทานที่ 13/);
+  const km = RIVERLINE.stops.reduce((sum, s) => sum + (s.kmToNext || 0), 0);
+  assert.ok(Math.abs(km - 122.97) < 1e-9);
+  assert.equal(RIVERLINE.totalHours, 28);
+});
+
+test("RIVERLINE: only two links carry a travel time, and it is RID's (11 h and 4 h), none invented", () => {
+  assert.deepEqual(RIVERLINE.stops.filter((s) => s.hoursToNext != null).map((s) => [s.code, s.hoursToNext]), [["K.63", 11], ["K.55A", 4]]);
+});
+
+test("RIVERLINE: K.56A is on the strip but not tracked, K.57 carries its local datum, the Gulf is the end", () => {
+  const by = Object.fromEntries(RIVERLINE.stops.map((s) => [s.code, s]));
+  assert.equal(by["K.56A"].file, undefined);
+  assert.equal(by["K.57"].datum.zero, -13.2);
+  assert.equal(by["K.2B"].datum, undefined);
+  assert.equal(by.GULF.file, undefined);
+});
+
+const NOW_RL = Date.parse("2026-10-01T23:00:00+07:00");
+const fresh = (levelMsl) => ({ levelMsl, updatedAt: "2026-10-01T22:00:00+07:00" });
+
+test("riverlineStrip: keeps the order, shows an untracked station as not tracked and never drops it", () => {
+  const strip = riverlineStrip({ "K.11A": fresh(12.03), "K.63": fresh(9.67), "K.2B": fresh(4.21), "K.57": fresh(15.12) }, NOW_RL);
+  assert.deepEqual(strip.map((s) => s.code), RIVERLINE.stops.map((s) => s.code));
+  const k56 = strip.find((s) => s.code === "K.56A");
+  assert.equal(k56.state, "not-tracked");
+  assert.equal(k56.levelMsl, null);
+  assert.equal(strip.find((s) => s.code === "GULF").state, "end");
+  assert.equal(strip.find((s) => s.code === "K.2B").state, "reading");
+  assert.equal(strip.find((s) => s.code === "K.2B").levelMsl, 4.21);
+});
+
+test("riverlineStrip: a tracked station with no usable reading says no data, never zero", () => {
+  const strip = riverlineStrip({ "K.63": { levelMsl: null, updatedAt: "2026-10-01T22:00:00+07:00" } }, NOW_RL);
+  const k63 = strip.find((s) => s.code === "K.63");
+  assert.equal(k63.state, "no-data");
+  assert.equal(k63.levelMsl, null);
+  assert.equal(strip.find((s) => s.code === "K.55A").state, "no-data");
+});
+
+test("riverlineStrip: a link with no printed time shows none; the two that have one show RID's", () => {
+  const strip = riverlineStrip({}, NOW_RL);
+  const link = (code) => { const s = strip.find((x) => x.code === code); return [s.kmToNext, s.hoursToNext]; };
+  assert.deepEqual(link("K.63"), [36.7, 11]);
+  assert.deepEqual(link("K.55A"), [15.2, 4]);
+  assert.deepEqual(link("K.2B"), [18.3, null]);
+  assert.deepEqual(link("GULF"), [null, null]);
+});
+
+test("riverlineStrip: a reading older than 6 h by the source's own time is flagged stale; fresh ones are not", () => {
+  const strip = riverlineStrip({ "K.2B": { levelMsl: 4.21, updatedAt: "2026-10-01T16:00:00+07:00" }, "K.57": fresh(15.12) }, NOW_RL);
+  assert.equal(strip.find((s) => s.code === "K.2B").stale, true);
+  assert.equal(strip.find((s) => s.code === "K.57").stale, false);
+});
+
+test("riverlineStrip: K.57 passes its datum through so the page can say the reading is not comparable", () => {
+  const k57 = riverlineStrip({ "K.57": fresh(15.12) }, NOW_RL).find((s) => s.code === "K.57");
+  assert.equal(k57.datum.zero, -13.2);
+  assert.equal(riverlineStrip({}, NOW_RL).find((s) => s.code === "K.2B").datum, undefined);
 });
