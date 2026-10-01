@@ -325,7 +325,9 @@
       files.map(async ([file, key]) => {
         const rows = await getHistory(file).catch(() => []);
         const s = seriesOf(rows, key === "updatedAt" ? "levelMsl" : "releaseM3s", key);
-        if (s.length) newest = Math.max(newest, s[s.length - 1].t);
+        // A mis-dated reading (in the future) must not stretch the axis every chart shares.
+        const ok = s.filter((p) => !isFutureReading(new Date(p.t).toISOString(), Date.now()));
+        if (ok.length) newest = Math.max(newest, ok[ok.length - 1].t);
       }),
     );
     if (newest) axisEndT = Math.ceil(newest / 3600000) * 3600000;
@@ -378,7 +380,9 @@
     const startT = endT - windowHours * 3600000;
     const pts = all.filter((p) => p.t >= startT && p.t <= endT);
     if (pts.length < (shared ? 1 : 2)) {
-      return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
+      // Readings exist but none in this Window (the gauge went quiet): say so, not "waiting for data".
+      const text = all.length ? `ไม่มีข้อมูลใน ${windowHours} ชม. ล่าสุด` : "รอข้อมูลสะสมเพื่อแสดงกราฟ";
+      return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">${text}</div></div>`;
     }
     const chart = renderChart({
       points: all, startT, endT, windowH: windowHours, digits, unit, ariaLabel: label, referenceNote: REFERENCE_NOTE,

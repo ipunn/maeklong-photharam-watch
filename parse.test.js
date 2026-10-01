@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -918,4 +918,14 @@ test("chartModel: a reference line the water is near is counted in the step, so 
 test("chartModel: without steps the scale is the data's own, as before", () => {
   const m = chartModel(levelPts([5.61, 5.84]), { startT: 1000, endT: 1000 + 2 * 3600000, minRange: 0.1 });
   assert.equal(spanOf(m), 0.23);
+});
+
+// Khai Luang once reported 23:00 on the wrong date (a day ahead). Such a row must not be believed:
+// it stretched every chart's shared time axis and blanked Photharam's trend.
+test("isFutureReading: a reading dated well ahead of now is future, a current or recent one is not", () => {
+  const now = new Date("2026-09-30T17:31:59Z").getTime();
+  assert.equal(isFutureReading("2026-10-01T23:00:00+07:00", now), true);
+  assert.equal(isFutureReading("2026-09-30T23:00:00+07:00", now), false);
+  assert.equal(isFutureReading("2026-10-01T00:20:00+07:00", now), false); // within the 1 h tolerance
+  assert.equal(isFutureReading(null, now), false);
 });

@@ -30,6 +30,7 @@ const {
   dailyHighLow,
   seriesOf,
   TRACKED_STATIONS,
+  isFutureReading,
 } = require("../parse.js");
 
 // DATA_DIR overrides the data folder so a run can be checked without touching the repo's data/.
@@ -164,6 +165,8 @@ async function scrapeRivers(scrapedAt) {
       const record = records.find((r) => r.station && Number(r.station.id) === id);
       if (!record) throw missing(`station ${id}`);
       const parsed = parseWaterLevelRecord(record);
+      // A mis-dated reading (the source once sent tomorrow's date) would stretch every chart's time axis.
+      if (isFutureReading(parsed.updatedAt, new Date(scrapedAt).getTime())) throw missing(`station ${id} dated in the future: ${parsed.updatedAt}`);
       const row = {
         scrapedAt,
         updatedAt: parsed.updatedAt,
@@ -252,7 +255,8 @@ async function scrapeDamArea(scrapedAt) {
     }
     outcomes.push(
       runItem(file, () => {
-        const { rows, bankMsl } = parseWaterLevelGraph(raw);
+        const { rows: allRows, bankMsl } = parseWaterLevelGraph(raw);
+        const rows = allRows.filter((r) => !isFutureReading(r.updatedAt, nowMs));
         if (!rows.length) throw missing(`station ${id} returned no readings`);
         const fresh = newGraphRows(readJson(file, []), rows).map((r) => {
           const row = { scrapedAt, updatedAt: r.updatedAt, levelMsl: r.levelMsl, bankMsl };

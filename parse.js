@@ -255,6 +255,13 @@ function seriesOf(rows, valueKey, timeKey) {
   return [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => ({ t, v }));
 }
 
+// True when a source's own timestamp is later than `nowMs` by more than `toleranceMs`: the source
+// mis-dated it (e.g. a day ahead), so it must not be stored or stretch the charts' shared time axis.
+function isFutureReading(updatedAt, nowMs, toleranceMs = 3600000) {
+  const t = new Date(updatedAt).getTime();
+  return !Number.isNaN(t) && t > nowMs + toleranceMs;
+}
+
 const WINDOW_TOLERANCE_MS = 60 * 60000;
 
 function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
@@ -574,5 +581,5 @@ function parseEgatChannelCapacity(html) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }
