@@ -347,8 +347,9 @@ test("isSameReading ignores scrapedAt and compares the source's values", () => {
   assert.equal(isSameReading({ ...a, extra: 1 }, a), false); // different shape is not the same reading
 });
 
-test("stationsForSite returns the Mae Klong gauges upstream to downstream, by ThaiWater station id", () => {
-  assert.deepEqual(stationsForSite("maeklong").map((s) => s.id), [505018, 2571, 2679, 832066, 710]);
+test("the bulk feed tracks Photharam; the other Mae Klong gauges come from the per-station graph feed", () => {
+  assert.deepEqual(stationsForSite("maeklong").map((s) => s.id), [710]);
+  assert.deepEqual(GRAPH_STATIONS.filter((s) => s.site === "maeklong").map((s) => s.id), [505018, 2571, 2679, 832066, 700554, 4007644]);
 });
 
 test("stationsForSite returns nothing for an unknown Site — never another Site's gauges", () => {

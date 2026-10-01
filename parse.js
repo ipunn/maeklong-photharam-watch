@@ -342,12 +342,6 @@ const SITES = ["maeklong", "bangkruai"];
 // บ้านปากแซง on the แควน้อย, which is used as a far-upstream gauge): 505018 K.58,
 // 2679 K.11A บ้านวังขนาย, 832066 K.55A สะพานค่ายหลวง, 710 โพธาราม.
 const TRACKED_STATIONS = [
-  { id: 505018, file: "pak-saeng.json", site: "maeklong" },
-  // K.37 บ้านวังเย็น (อ.ด่านมะขามเตี้ย): reports a discharge. Above the Mae Klong Dam by level
-  // (31.77 m MSL against the dam's 22.76), so it sits before the Barrage in the river line.
-  { id: 2571, file: "k37.json", site: "maeklong" },
-  { id: 2679, file: "wang-khanai.json", site: "maeklong" },
-  { id: 832066, file: "khai-luang.json", site: "maeklong" },
   { id: 710, file: "photharam.json", site: "maeklong" },
   // Bang Kruai Site (proxy gauges; ids re-verified by name against the live feed 2026-09-29).
   // `tidal` is configuration, not inferred: tidal gauges get a daily high/low, not a trend.
@@ -363,6 +357,15 @@ const TRACKED_STATIONS = [
 // `waterlevel_load`. `graphType` is that endpoint's station_type. Ids checked against the live
 // station catalogue 2026-09-30 (.scratch/**/research/mae-klong-dam-data-sources.md).
 const GRAPH_STATIONS = [
+  // These four were on the bulk feed until 2026-10-01, when it froze them (same value, the date a day
+  // ahead) while their per-station graph kept updating. The graph feed's hourly values match the ones
+  // already stored, so the histories continue unbroken.
+  { id: 505018, file: "pak-saeng.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.58 บ้านปากแซง (แควน้อย), far upstream
+  // K.37 บ้านวังเย็น (อ.ด่านมะขามเตี้ย): reports a discharge. Above the Mae Klong Dam by level
+  // (31.77 m MSL against the dam's 22.76), so it sits before the Barrage in the river line.
+  { id: 2571, file: "k37.json", site: "maeklong", graphType: "tele_waterlevel" },
+  { id: 2679, file: "wang-khanai.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.11A บ้านวังขนาย
+  { id: 832066, file: "khai-luang.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.55A สะพานค่ายหลวง: level and discharge
   { id: 700554, file: "barrage-snd04.json", site: "maeklong", graphType: "tele_waterlevel" }, // เขื่อนแม่กลอง (EGAT SND04): the Barrage, level only
   { id: 4007644, file: "k63.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.63 บ้านใหม่, 4.26 km below K.11A: level and discharge
 ];
