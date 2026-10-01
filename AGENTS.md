@@ -8,6 +8,10 @@ Issues and specs live as local markdown files under `.scratch/<feature>/` (no Gi
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+## Look and motion
+
+Colours, type, cards, the sticky pill and the animation style are written down in `docs/design/look.md`. Read it before touching visuals, and follow it instead of asking for a reference site.
+
 ## Layout changes
 
 Whenever you touch layout, markup or CSS (both `index.html` and `bangkruai.html`), check it on a phone-width viewport as well as desktop, before calling it done. Most people read these pages on a phone.
