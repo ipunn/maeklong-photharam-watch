@@ -1,0 +1,78 @@
+/* PROTOTYPE variant C — full flood.pop style: staggered springy entrances, layered waves, sonar, shimmer, drifting bubbles, glow. */
+@keyframes c-rise { 0% { opacity: 0; transform: translateY(28px) scale(.97); } 60% { opacity: 1; transform: translateY(-4px) scale(1.003); } 100% { transform: none; } }
+@keyframes c-wave { from { background-position-x: 0; } to { background-position-x: 320px; } }
+@keyframes c-wave2 { from { background-position-x: 0; } to { background-position-x: -320px; } }
+@keyframes c-sonar { 0% { transform: translate(-50%,-50%) scale(.4); opacity: .55; } 100% { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } }
+@keyframes c-pulse { 0% { box-shadow: 0 0 0 0 rgba(31,157,107,.55); } 70%, 100% { box-shadow: 0 0 0 12px rgba(31,157,107,0); } }
+@keyframes c-shimmer { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(260%) skewX(-18deg); } }
+@keyframes c-drift { from { transform: translateY(0) translateX(0); opacity: 0; } 15% { opacity: .55; } to { transform: translateY(-110vh) translateX(24px); opacity: 0; } }
+@keyframes c-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes c-pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0); } 70% { transform: translate(-50%,-50%) scale(1.8); } 100% { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+@keyframes c-glow { 0%,100% { box-shadow: var(--shadow), 0 0 0 0 rgba(27,114,168,0); } 50% { box-shadow: var(--shadow), 0 0 36px 2px rgba(27,114,168,.22); } }
+@keyframes c-grad { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
+
+body { background: linear-gradient(180deg, #cfe5f2 0, #e6f1f7 380px, #f4f8fb 100%) fixed; }
+
+/* layered waves behind the top of the page */
+body::before, body::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 190px; pointer-events: none; z-index: 0;
+  background-repeat: repeat-x; background-size: 320px 60px; background-position: 0 100%;
+}
+body::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='60' viewBox='0 0 320 60'%3E%3Cpath d='M0 30 Q40 6 80 30 T160 30 T240 30 T320 30 V60 H0Z' fill='%231b72a8' fill-opacity='.10'/%3E%3C/svg%3E"); animation: c-wave 14s linear infinite; }
+body::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='60' viewBox='0 0 320 60'%3E%3Cpath d='M0 36 Q40 14 80 36 T160 36 T240 36 T320 36 V60 H0Z' fill='%231b72a8' fill-opacity='.14'/%3E%3C/svg%3E"); animation: c-wave2 9s linear infinite; }
+body { position: relative; }
+h1, .health, .window-toggle, .here, .context, .notice { position: relative; z-index: 1; }
+
+/* drifting bubbles (JS-free: three pseudo layers via radial gradients on html) */
+html::before {
+  content: ""; position: fixed; left: 0; right: 0; bottom: -20px; height: 24px; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(circle 5px at 12% 50%, rgba(27,114,168,.35), transparent 70%),
+    radial-gradient(circle 4px at 47% 50%, rgba(27,114,168,.3), transparent 70%),
+    radial-gradient(circle 6px at 81% 50%, rgba(27,114,168,.3), transparent 70%);
+  animation: c-drift 12s linear infinite;
+}
+
+/* springy staggered entrances */
+.pill, h1, .health, .here, .context, .notice { animation: c-rise 1s var(--ease-out) both; }
+h1 { animation-delay: .02s; } .pill { animation-delay: .1s; } .here { animation-delay: .2s; } .context { animation-delay: .5s; }
+.here .flow-node, .station-card, .branch, .here-summary { animation: c-rise 1s var(--ease-out) both; }
+.here .flow-node:nth-child(1) { animation-delay: .3s; } .here .flow-node:nth-child(2) { animation-delay: .42s; }
+.here-summary { animation-delay: .56s; }
+.station-card:nth-child(2) { animation-delay: .1s; } .station-card:nth-child(3) { animation-delay: .2s; } .station-card:nth-child(4) { animation-delay: .3s; }
+.flow-node:nth-child(odd) { animation-delay: .05s; }
+
+/* live dot with sonar ring */
+.live-dot { position: relative; animation: c-pulse 2s ease-out infinite; }
+.live-dot::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #1f9d6b; animation: c-sonar 2s ease-out infinite; }
+
+/* headline panel breathes; shimmer sweeps once across each card on load */
+.here { animation: c-rise 1s var(--ease-out) .2s both, c-glow 5s ease-in-out 1.5s infinite; }
+.here .flow-node, .station-card { position: relative; overflow: hidden; }
+.here .flow-node::after, .station-card::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.75), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  animation: c-shimmer 1.4s var(--ease) .9s 1 both;
+}
+.here .flow-node::before { display: none; }
+
+/* big numerals get a flowing blue gradient */
+.here .flow-value .num, .station-level .num {
+  background: linear-gradient(90deg, #0e2536, #1b72a8, #0e2536); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  animation: c-grad 6s linear infinite;
+}
+
+/* chart: draw, then a sonar ping from the newest point */
+.spark-plot svg { animation: c-reveal 1.4s var(--ease-out) .5s both; }
+.spark-dot { animation: c-pop .7s var(--ease-out) 1.6s both; }
+.spark-dot:not(.spark-dot-small)::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--line); animation: c-sonar 2.2s ease-out 2.2s infinite;
+}
+
+/* hover/press */
+.station-card, .here .flow-node { transition: transform .5s var(--ease), box-shadow .5s var(--ease); }
+@media (hover: hover) { .station-card:hover, .here .flow-node:hover { transform: translateY(-4px); } }
+.pill-sites a.on { background: linear-gradient(135deg, #1b72a8, #2a93c9); box-shadow: 0 4px 14px -4px rgba(27,114,168,.6); }

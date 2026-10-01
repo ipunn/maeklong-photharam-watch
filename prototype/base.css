@@ -1,0 +1,100 @@
+/* PROTOTYPE shared look for B and C: light, glassy, big numerals, sticky pill. Status colours untouched. */
+:root {
+  --bg: #eaf2f7;
+  --card-bg: #ffffff;
+  --text: #1c3447;
+  --text-dim: #5d7384;
+  --border: rgba(24, 66, 92, .10);
+  --accent: #1b72a8;
+  --ease: cubic-bezier(.32, .72, 0, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --shadow: 0 1px 2px rgba(20, 60, 88, .06), 0 10px 30px -12px rgba(20, 60, 88, .22);
+}
+html { background: var(--bg); }
+body {
+  background: linear-gradient(180deg, #dcebf4 0, #eef5f9 340px, #f5f9fb 100%) fixed;
+  padding: 0 16px 80px;
+  overflow-x: hidden;
+}
+h1 { font-size: 1.15rem; letter-spacing: -.01em; margin: 14px 0 6px; display: flex; align-items: center; gap: 8px; }
+
+/* live dot */
+.live-dot { width: 10px; height: 10px; border-radius: 50%; background: #1f9d6b; flex: none; box-shadow: 0 0 0 0 rgba(31,157,107,.5); }
+
+/* ---- sticky pill: sites + window toggle in ONE bar ---- */
+.pill {
+  position: sticky; top: 8px; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 0 0 10px; padding: 3px;
+  min-height: 48px;
+  background: rgba(255,255,255,.78);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.pill-sites { display: flex; gap: 2px; }
+.pill-sites a {
+  display: grid; place-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px;
+  color: var(--text-dim); text-decoration: none; font-size: .92rem; font-weight: 600;
+  transition: background .35s var(--ease), color .35s var(--ease);
+}
+.pill-sites a.on { background: var(--accent); color: #fff; }
+.pill .window-toggle { position: static; background: none; border: 0; padding: 0; }
+.pill .wt-label { display: none; }
+.pill .wt-buttons { border: 0; background: rgba(27,114,168,.08); border-radius: 999px; padding: 2px; }
+.pill .wt-btn { min-height: 44px; min-width: 40px; padding: 0 10px; border: 0 !important; border-radius: 999px; font-size: .85rem; transition: background .35s var(--ease), color .35s var(--ease), transform .35s var(--ease); }
+.pill .wt-btn:active { transform: scale(.94); }
+.pill .wt-btn[aria-pressed="true"] { background: #fff; color: var(--accent); box-shadow: 0 1px 4px rgba(20,60,88,.18); }
+.wt-note { font-size: .74rem; }
+@media (max-width: 480px) {
+  .pill-sites a { padding: 0 11px; font-size: .86rem; }
+  .pill .wt-btn { padding: 0 8px; min-width: 38px; font-size: .8rem; }
+}
+
+/* ---- cards ---- */
+.here {
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 26px;
+  background: rgba(255,255,255,.72);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  padding: 18px 14px 14px;
+}
+.here .section-title { font-size: 1.5rem; letter-spacing: -.02em; }
+.here .flow-node {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(20,60,88,.05);
+}
+.station-card, .flow-node { border-radius: 20px; border-color: var(--border); }
+.station-card { box-shadow: var(--shadow); background: #fff; }
+.here .flow-name { font-size: 1.15rem; font-weight: 700; letter-spacing: -.01em; }
+
+/* ---- big numerals; the label shrinks to a caption above ---- */
+.here .flow-value, .station-level {
+  font-size: 3.4rem;
+  font-weight: 800;
+  letter-spacing: -.04em;
+  line-height: 1.02;
+  font-variant-numeric: tabular-nums;
+  color: #0e2536;
+}
+.here .flow-value .flow-label, .flow-value .flow-label {
+  display: block; font-size: .8rem; font-weight: 600; letter-spacing: 0; color: var(--text-dim); margin-bottom: 2px;
+}
+.here .flow-value .unit, .station-level .unit { font-size: .95rem; font-weight: 500; letter-spacing: 0; color: var(--text-dim); }
+.here .flow-q.flow-value { font-size: 2.3rem; }
+@media (max-width: 480px) {
+  .here .flow-value, .station-level { font-size: 3rem; }
+  .here .flow-q.flow-value { font-size: 2rem; }
+}
+.flow-type { letter-spacing: .02em; }
+.trend { font-weight: 700; }
+
+/* chart line a touch heavier and rounder */
+.spark-line { stroke-width: 2.5; }
+
+/* proto bar must not hide the footer */
+.notice { margin-bottom: 70px; }
