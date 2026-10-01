@@ -45,6 +45,16 @@
     return historyCache.get(file);
   }
 
+  // The Mae Klong gauges' hourly rows without a newest reading that is a suspect step (suspectLatest in
+  // parse.js: one impossible hour, e.g. K.11A 17.56 -> 12.03 m). History is untouched; this is display only.
+  // Everything on the page (level, trend, chart, strip) then uses the last trusted reading, and says so.
+  function trusted(rows) {
+    const s = suspectLatest(rows);
+    return s ? { rows: rows.filter((r) => r !== s.row), suspect: s } : { rows, suspect: null };
+  }
+  const suspectText = (s) =>
+    `ค่าล่าสุด ${formatShortTime(s.updatedAt)} = ${s.value.toFixed(2)} ม. เปลี่ยน ${Math.abs(s.deltaM).toFixed(2)} ม. ใน ${+s.hours.toFixed(1)} ชม. ผิดปกติ จึงยังไม่ใช้ รอค่าถัดไปยืนยัน (ระดับที่แสดงคือค่าล่าสุดก่อนหน้านั้น)`;
+
   function ageMinutes(iso) {
     const ms = new Date(iso).getTime();
     if (Number.isNaN(ms)) return Infinity;
@@ -128,7 +138,7 @@
   }
 
   async function loadStation({ file, name, role, staleMinutes, references }) {
-    const history = await getHistory(file);
+    const { rows: history, suspect } = trusted(await getHistory(file));
     const latest = history[history.length - 1];
 
     const card = document.createElement("div");
@@ -157,6 +167,7 @@
       </div>
       <div class="station-level">${latest.levelMsl.toFixed(2)} <span class="unit">ม.รทก.</span></div>
       <div class="station-meta" data-stale="${stale}">${formatAge(mins)}${stale ? ` — ${STALE_TEXT}` : ""}</div>
+      ${suspect ? `<div class="station-meta">${suspectText(suspect)}</div>` : ""}
       ${referenceHtml(latest.levelMsl, references, "station-meta")}
       ${levelChartHtml(history, false, references)}
     `;
@@ -457,6 +468,7 @@
       remarks.push("ไม่มีข้อมูลอัตโนมัติของอัตราระบายและการเปิดบานของเขื่อน ประกาศโดยสำนักงานชลประทานที่ 13");
     }
     if (!d.trend) remarks.push(noTrendText(d));
+    if (d.suspect) remarks.unshift(suspectText(d.suspect));
     const q = node.kind === "gauge" ? d.latestQ : null;
     if (q) remarks.push("เป็นอัตราการไหลของแม่น้ำที่จุดวัด ไม่ใช่อัตราระบายของเขื่อน");
     // The discharge has its own reading time: say so when it is not the newest row's, and flag it when old.
@@ -498,7 +510,7 @@
         asOf: latest.reportedAt ? formatShortTime(latest.reportedAt) : null,
       };
     }
-    const rows = await getHistory(node.kind === "barrage" ? node.barrage.file : node.station.file).catch(() => []);
+    const { rows, suspect } = trusted(await getHistory(node.kind === "barrage" ? node.barrage.file : node.station.file).catch(() => []));
     const latest = rows[rows.length - 1];
     if (!latest || typeof latest.levelMsl !== "number") return null;
     const mins = ageMinutes(latest.updatedAt);
@@ -506,6 +518,7 @@
     return {
       latest,
       rows,
+      suspect,
       latestQ,
       qStale: !latestQ || !(ageMinutes(latestQ.updatedAt) <= STALE_MINUTES),
       // Stale readings get no trend (see the dam branch above).
@@ -616,7 +629,8 @@
     return `<div class="flow-meta">${where} <span class="unit">(ตลิ่ง ${bank.toFixed(2)} ${unit} · ${BANK_NOTE} · เส้นตลิ่งจะแสดงบนกราฟเมื่อระดับน้ำห่างไม่เกิน ${REFERENCE_PROXIMITY_M.toFixed(2)} ม.)</span></div>`;
   }
 
-  function lowerNodeHtml(g, rows) {
+  function lowerNodeHtml(g, rawRows) {
+    const { rows, suspect } = trusted(rawRows);
     const type = `<div class="flow-type" data-type="gauge">จุดวัดระดับน้ำในแม่น้ำ</div>`;
     const title = `${g.name} <span class="flow-role">${g.code} · ${g.role}</span>`;
     const latest = rows[rows.length - 1];
@@ -631,6 +645,7 @@
     const refs = bank == null ? [] : [{ v: bank, name: "ตลิ่ง" }];
     const remarks = [TIDE_INFLUENCE_NOTE];
     if (g.datum) remarks.unshift(datumNote(g.datum));
+    if (suspect) remarks.unshift(suspectText(suspect));
     if (!trend) remarks.push(noTrendText({ stale }));
     return `<li class="flow-node${stale ? " flow-stale" : ""}">${type}<div class="flow-name">${title}</div>
       <div class="flow-body"><div class="flow-text">
@@ -681,7 +696,8 @@
       if (s.state === "reading") {
         const unit = s.datum ? `${DATUM_UNIT} (ไม่ใช่ ม.รทก.)` : s.code === "SND04" ? "ม.รทก. ที่เขื่อน" : "ม.รทก.";
         read = `<div class="rl-read"><b>${s.levelMsl.toFixed(2)}</b> <span class="unit">${unit}</span> · <span data-stale="${s.stale}">${formatShortTime(s.updatedAt)}${s.stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</span></div>`
-          + (s.datum ? `<div class="rl-sub">${datumNote(s.datum)}</div>` : "");
+          + (s.datum ? `<div class="rl-sub">${datumNote(s.datum)}</div>` : "")
+          + (s.suspect ? `<div class="rl-sub">${suspectText(s.suspect)}</div>` : "");
       } else if (s.state === "no-data") read = `<div class="rl-read rl-none">ไม่มีข้อมูลระดับน้ำ</div>`;
       else if (s.state === "not-tracked") read = `<div class="rl-read rl-none">ไม่ได้ติดตาม (ไม่มีข้อมูลอัตโนมัติในระบบนี้)</div>`;
       else read = `<div class="rl-read rl-none">ปากแม่น้ำออกสู่ทะเล</div>`;
@@ -699,7 +715,11 @@
     const stripEl = document.getElementById("riverline");
     const gaugesEl = document.getElementById("lower-gauges");
     if (!stripEl || !gaugesEl) return;
-    const latestOf = async (file) => (await getHistory(file).catch(() => [])).slice(-1)[0];
+    const latestOf = async (file) => {
+      const { rows, suspect } = trusted(await getHistory(file).catch(() => []));
+      const last = rows[rows.length - 1];
+      return last && suspect ? { ...last, suspect } : last;
+    };
     const readings = {};
     await Promise.all(RIVERLINE.stops.filter((x) => x.file).map(async (x) => (readings[x.code] = await latestOf(x.file))));
     const lowerRows = await Promise.all(LOWER_GAUGES.map((g) => getHistory(g.file).catch(() => [])));

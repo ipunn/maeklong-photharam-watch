@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading, suspectLatest, MAX_STEP_M_PER_H } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -1085,4 +1085,53 @@ test("riverlineStrip: K.57 passes its datum through so the page can say the read
   const k57 = riverlineStrip({ "K.57": fresh(15.12) }, NOW_RL).find((s) => s.code === "K.57");
   assert.equal(k57.datum.zero, -13.2);
   assert.equal(riverlineStrip({}, NOW_RL).find((s) => s.code === "K.2B").datum, undefined);
+});
+
+// ---- suspectLatest: a display guard against one impossible hour (K.11A 22:00 17.56 -> 23:00 12.03, 2026-10-01) ----
+const lv = (hhmm, levelMsl, day = "2026-10-01") => ({ updatedAt: `${day}T${hhmm}:00+07:00`, levelMsl });
+// the real K.11A and K.63 sequences from data/ on 2026-10-01
+const K11A_SPIKE = [lv("20:00", 17.76), lv("21:00", 17.66), lv("22:00", 17.56), lv("23:00", 12.03)];
+const K63_DIP = [lv("07:00", 17.55), lv("08:00", 14.81), lv("09:00", 17.47)];
+
+test("suspectLatest: K.11A's 5.53 m drop in one hour is suspect, with the numbers to say so", () => {
+  const s = suspectLatest(K11A_SPIKE);
+  assert.equal(s.row, K11A_SPIKE[3]);
+  assert.ok(Math.abs(s.deltaM - -5.53) < 1e-9);
+  assert.equal(s.hours, 1);
+  assert.equal(s.lastTrusted, K11A_SPIKE[2]);
+});
+
+test("suspectLatest: once the next hour returns to the old level, the reading is trusted again (a spike, not a shift)", () => {
+  assert.equal(suspectLatest([...K11A_SPIKE, lv("00:00", 17.4, "2026-10-02")]), null);
+  assert.equal(suspectLatest(K63_DIP), null); // K.63's real 08:00 dip, recovered at 09:00
+  assert.ok(suspectLatest(K63_DIP.slice(0, 2))); // before the recovery it is suspect: -2.74 m in 1 h
+});
+
+test("suspectLatest: a sustained new level is accepted from the next reading on, not hidden for ever", () => {
+  assert.equal(suspectLatest([...K11A_SPIKE, lv("00:00", 12.0, "2026-10-02")]), null);
+});
+
+test("suspectLatest: ordinary movement, a lone reading, a long gap and non-numeric rows are never suspect", () => {
+  assert.equal(suspectLatest([lv("21:00", 17.66), lv("22:00", 17.56)]), null);
+  assert.equal(suspectLatest([lv("22:00", 17.56)]), null);
+  assert.equal(suspectLatest([]), null);
+  // 6 h apart: a big difference cannot be judged as one step
+  assert.equal(suspectLatest([lv("10:00", 17.56), lv("16:00", 12.03)]), null);
+  // a null level in between is ignored, never read as 0
+  assert.equal(suspectLatest([lv("21:00", 17.66), lv("22:00", 17.56), { updatedAt: "2026-10-01T23:00:00+07:00", levelMsl: null }]), null);
+});
+
+test("suspectLatest: the limit is per hour, so a fast 10-minute gauge is judged on the same scale", () => {
+  const fast = [{ updatedAt: "2026-10-01T22:00:00+07:00", levelMsl: 5 }, { updatedAt: "2026-10-01T22:10:00+07:00", levelMsl: 5.2 }];
+  assert.equal(suspectLatest(fast), null); // 1.2 m/h
+  assert.ok(suspectLatest([fast[0], { updatedAt: "2026-10-01T22:10:00+07:00", levelMsl: 5.5 }])); // 3 m/h
+  assert.equal(MAX_STEP_M_PER_H, 2);
+});
+
+test("riverlineStrip: a suspect latest is passed through so the page can say so instead of showing it as the level", () => {
+  const note = { value: 12.03, updatedAt: "2026-10-01T23:00:00+07:00", deltaM: -5.53, hours: 1 };
+  const k11a = riverlineStrip({ "K.11A": { levelMsl: 17.56, updatedAt: "2026-10-01T22:00:00+07:00", suspect: note } }, NOW_RL).find((x) => x.code === "K.11A");
+  assert.equal(k11a.levelMsl, 17.56);
+  assert.deepEqual(k11a.suspect, note);
+  assert.equal(riverlineStrip({ "K.63": fresh(9) }, NOW_RL).find((x) => x.code === "K.63").suspect, null);
 });

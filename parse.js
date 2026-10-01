@@ -603,6 +603,30 @@ function parseEgatChannelCapacity(html) {
   return out;
 }
 
+// A display guard, not a rewrite of History: the newest reading of a Mae Klong gauge is "suspect" when
+// the level moved by more than MAX_STEP_M_PER_H against the reading before it, and the reading after
+// that is not here to confirm it (K.11A on 2026-10-01 fell 5.53 m in one hour, with a discharge a
+// tenth of its neighbours', and K.63 did the same for one hour that morning). The page then shows the
+// last trusted reading and says what it set aside. Once a later reading either returns to the old
+// level (a spike) or holds the new one (a real shift) nothing is suspect. Steps over a gap longer than
+// 3 h cannot be judged. PLACEHOLDER limit, for the maintainer to tune; no real Mae Klong series has
+// stepped over 1 m/h otherwise.
+const MAX_STEP_M_PER_H = 2;
+
+function suspectLatest(rows, limitMPerH = MAX_STEP_M_PER_H) {
+  const pts = rows.filter((r) => typeof r.levelMsl === "number" && Number.isFinite(r.levelMsl) && !Number.isNaN(new Date(r.updatedAt).getTime()));
+  const tooBig = (a, b) => {
+    const hours = (new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) / 3600000;
+    return hours > 0 && hours <= 3 && Math.abs(b.levelMsl - a.levelMsl) / hours > limitMPerH;
+  };
+  const last = pts[pts.length - 1];
+  const prev = pts[pts.length - 2];
+  const prev2 = pts[pts.length - 3];
+  if (!last || !prev || !tooBig(prev, last)) return null;
+  if (prev2 && !tooBig(prev2, last)) return null; // the reading before was the spike, this one is back
+  return { row: last, value: last.levelMsl, updatedAt: last.updatedAt, deltaM: last.levelMsl - prev.levelMsl, hours: (new Date(last.updatedAt).getTime() - new Date(prev.updatedAt).getTime()) / 3600000, lastTrusted: prev };
+}
+
 // A reading older than this, by the SOURCE's own time, is flagged. An unreadable time is stale: it
 // is never taken as fresh.
 function isStaleReading(updatedAt, nowMs, staleMinutes = 6 * 60) {
@@ -644,10 +668,10 @@ function riverlineStrip(readings, nowMs, stops = RIVERLINE.stops) {
     const r = readings[s.code];
     const ok = r && typeof r.levelMsl === "number" && Number.isFinite(r.levelMsl);
     if (!ok) return { ...base, state: "no-data", levelMsl: null, updatedAt: null, stale: false };
-    return { ...base, state: "reading", levelMsl: r.levelMsl, updatedAt: r.updatedAt, stale: isStaleReading(r.updatedAt, nowMs) };
+    return { ...base, state: "reading", levelMsl: r.levelMsl, updatedAt: r.updatedAt, stale: isStaleReading(r.updatedAt, nowMs), suspect: r.suspect || null };
   });
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading, LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { suspectLatest, MAX_STEP_M_PER_H, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading, LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }
