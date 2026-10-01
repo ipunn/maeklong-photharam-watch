@@ -1,6 +1,6 @@
 # 01: K.11A level: ThaiWater and RID disagree
 
-Status: in-diagnosis
+Status: root-cause-found
 
 **Found:** 2026-10-01, while researching the lower Mae Klong (`.scratch/maeklong-photharam-water-monitor/research/lower-mae-klong-riverline.md`, "Avoid"). Deliberately kept out of the lower-riverline work.
 
@@ -31,3 +31,14 @@ Open: confirm 2 with the 00:00 reading; decide what the page should do with a ph
 `suspectLatest` (parse.js, tested at the parse seam with the real K.11A and K.63 sequences) marks the newest reading of a Mae Klong gauge suspect when the level moved over 2 m/h (placeholder limit, `MAX_STEP_M_PER_H`) against the reading before it and no later reading has confirmed it. The page then shows the last trusted reading with its own time, and a plain note giving the set-aside value, time and step. A later reading that returns to the old level (a spike) or holds the new one (a real shift) clears it, so a real change is never hidden for more than one reading. History is untouched; Bang Kruai and the tidal MKG006 are not guarded. Applied to the flow nodes, the detail cards, the Riverline strip and K.2B/K.57.
 
 Still open: whether the 00:00 reading recovers (confirms hypothesis 2); why ThaiWater reports a discharge and storage figure for K.11A in that hour.
+
+### 2026-10-02 00:30 +07 diagnosis, part 2: root cause
+
+Hypothesis 2 was close but the real cause is in our Collector. ThaiWater's graph feed **revises** hourly values after first publishing them:
+- K.11A 23:00 was 12.03 (Q 238) when we read it at 23:11; the feed now says **17.57**.
+- K.63 08:00 was 14.81 (Q 1,238) when we read it; the feed now says **17.51 (Q 2,211)**.
+Our stored History still holds the provisional values, because `newGraphRows` appends only hours strictly newer than the last stored one, so a corrected value for an hour already stored is never read again. Both "glitches" are the same thing: a provisional first value for the newest hour (a partial hour, with a discharge computed from it) that the source later corrects.
+
+Effects: charts and trends keep a dip the source no longer reports, and the K.63 dip at 08:00 is permanently in History.
+
+Options (not done, needs a decision because History is append-only): (a) each run also re-reads the last few stored hours, and when the source's value for an hour differs, append a corrected row with the same `updatedAt` (the page already lets the later row win per source time, `seriesOf`), keeping the provisional one in the log; (b) leave it and rely on the display guard (`suspectLatest`), which only hides the newest hour. The same rule would apply to K.2B, K.57, K.55A, the Barrage (all graph-fed).
