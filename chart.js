@@ -62,15 +62,17 @@
     const refLines = m.references.map((r) => `<line class="spark-ref" data-level="${r.level || ""}" x1="0" y1="${(r.y * H).toFixed(1)}" x2="${W}" y2="${(r.y * H).toFixed(1)}" />`).join("");
     const gapRects = m.gaps.map((g) => `<rect class="spark-gap" x="${px(g.x0).toFixed(1)}" y="0" width="${(px(g.x1) - px(g.x0)).toFixed(1)}" height="${H}" />`).join("");
     const lines = m.segments
-      .map((seg) =>
-        seg.length > 1
-          ? `<polyline class="spark-line" points="${seg.map((p) => `${px(p.x).toFixed(1)},${(p.y * H).toFixed(1)}`).join(" ")}" />`
-          : seg[0].x === m.last.x && seg[0].y === m.last.y
-            ? "" // the newest reading is drawn as the end dot below
-            : `<path class="spark-dot spark-dot-small" d="M${px(seg[0].x).toFixed(1)} ${(seg[0].y * H).toFixed(1)}h0" />`,
-      )
+      .filter((seg) => seg.length > 1)
+      .map((seg) => `<polyline class="spark-line" points="${seg.map((p) => `${px(p.x).toFixed(1)},${(p.y * H).toFixed(1)}`).join(" ")}" />`)
       .join("");
-    const lastDot = `<path class="spark-dot" d="M${px(m.last.x).toFixed(1)} ${(m.last.y * H).toFixed(1)}h0" />`;
+    // Dots are HTML circles, not zero-length SVG strokes: the svg is stretched (preserveAspectRatio none)
+    // and some browsers (iOS Safari) draw such a stroke as an oval. A lone reading gets a small dot; the newest, a larger one.
+    const dot = (pt, cls) => `<span class="spark-dot${cls}" aria-hidden="true" style="left:${pct(pt.x)}%;top:${(pt.y * 100).toFixed(2)}%"></span>`;
+    const dots = m.segments
+      .filter((seg) => seg.length === 1 && !(seg[0].x === m.last.x && seg[0].y === m.last.y))
+      .map((seg) => dot(seg[0], " spark-dot-small"))
+      .join("");
+    const lastDot = dot(m.last, "");
 
     const yLabels = spaceLabels(m.yLabels)
       .map((l) => `<span class="spark-ylab${m.references.some((r) => r.v === l.v) ? " ref" : ""}" data-level="${(m.references.find((r) => r.v === l.v) || {}).level || ""}" style="top:${(l.shownY * 100).toFixed(1)}%">${num(l.v)}</span>`)
@@ -94,8 +96,8 @@
 
     return `<div class="spark-plot"${m.references.length ? " data-tall" : ""}>
         <div class="spark-canvas">
-          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${opts.ariaLabel || ""}">${gapRects}${hGrid}${vGrid}${refLines}${lines}${lastDot}</svg>
-          ${yLabels}${gapLabels}
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${opts.ariaLabel || ""}">${gapRects}${hGrid}${vGrid}${refLines}${lines}</svg>
+          ${dots}${lastDot}${yLabels}${gapLabels}
         </div>
         <div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${unitLabel}${tickLabels}</div>
       </div>${cover}${scale}${legend}`;

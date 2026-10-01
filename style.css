@@ -539,13 +539,15 @@ h1 {
   stroke-linecap: round;
 }
 
-/* zero-length round-capped path = a true circle even though the svg is stretched */
+/* an HTML circle placed over the stretched svg, so it stays round in every browser */
 .spark-dot {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 8;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .spark-cap {
@@ -1138,7 +1140,8 @@ h1 {
   pointer-events: none;
 }
 .spark-dot-small {
-  stroke-width: 5;
+  width: 5px;
+  height: 5px;
 }
 .spark-legend {
   margin-top: 2px;
