@@ -261,6 +261,12 @@
   const K63 = { file: "data/k63.json", name: "บ้านใหม่ (K.63)", role: "ท้ายจุด K.11A 4.26 กม.", staleMinutes: STALE_MINUTES };
   // The Barrage: a level and nothing else (no release, no gates, no stored volume).
   const BARRAGE = { file: "data/barrage-snd04.json", name: "เขื่อนแม่กลอง", code: "SND04" };
+  // Below โพธาราม (see the block further down for how they are drawn).
+  const K2B = { code: "K.2B", file: "data/k2b.json", name: "สะพานธนะรัชต์", role: "อ.เมืองราชบุรี จ.ราชบุรี" };
+  const K57 = { code: "K.57", file: "data/k57.json", name: "สะพานบางนกแขวก", role: "อ.บางคนที จ.สมุทรสงคราม", datum: RIVERLINE.stops.find((x) => x.code === "K.57").datum };
+  const LOWER_GAUGES = [K2B, K57];
+  const K56A = RIVERLINE.stops.find((x) => x.code === "K.56A");
+  const MOUTH = { code: "MKG006", file: "data/daily-mkg006.json", name: "พระรามสอง", role: "ปากแม่น้ำ อ.เมืองสมุทรสงคราม" };
 
   // The two upstream rivers are PARALLEL, not in sequence: they merge at Kanchanaburi
   // into the Mae Klong, so they are drawn as separate branches, then one main line.
@@ -292,6 +298,11 @@
     { kind: "gauge", station: STATIONS[2] },
     { kind: "you", name: "พื้นที่ของคุณ", text: "อำเภอโพธาราม จังหวัดราชบุรี" },
     { kind: "gauge", station: STATIONS[3] },
+    // Below โพธาราม, in RID's order. K.56A is on the chain but not tracked: kept, never dropped.
+    { kind: "untracked", stop: K56A },
+    { kind: "lower", g: K2B },
+    { kind: "lower", g: K57 },
+    { kind: "mouth", g: MOUTH },
   ];
   const FLOW = [...BRANCHES.flatMap((b) => b.nodes), ...MAIN];
 
@@ -432,7 +443,33 @@
     return `<div class="flow-meta">ความจุลำน้ำตาม กฟผ. ${fmtM3s(c.capacityM3s)} ลบ.ม./วินาที (ณ ${formatShortTime(c.asOf)})${diff}</div>`;
   }
 
+  // RID's distance (and printed travel time, where there is one) to the next station on the chain,
+  // named, because other nodes (the watched area) can sit between the two.
+  function linkHtml(code) {
+    const l = riverlineLink(code);
+    if (!l) return "";
+    return `<div class="flow-link">↓ ถึง ${l.toName}${l.toCode === "GULF" ? "" : ` ${l.toCode}`} อีก ${l.km.toLocaleString("en-US")} กม.${l.hours != null ? ` · กรมชลประทานระบุเดินทางราว ${l.hours} ชม.` : ""}</div>`;
+  }
+  const riverCodeOf = (node) => {
+    const file = (node.station && node.station.file) || (node.barrage && node.barrage.file) || (node.g && node.g.file);
+    const stop = RIVERLINE.stops.find((x) => (file && x.file === file) || (node.stop && x === node.stop));
+    return stop && stop.code;
+  };
+
   function flowNodeHtml(node, d, roleOverride, holdRange) {
+    const html = flowNodeBody(node, d, roleOverride, holdRange);
+    // Not in the watched-area panel (it passes roleOverride / holdRange): only in the river diagram.
+    if (roleOverride !== undefined || holdRange !== undefined) return html;
+    const link = linkHtml(riverCodeOf(node));
+    return link ? html.replace(/<\/li>\s*$/, `${link}</li>`) : html;
+  }
+
+  function flowNodeBody(node, d, roleOverride, holdRange) {
+    if (node.kind === "untracked") {
+      return `<li class="flow-node flow-untracked"><div class="flow-type" data-type="gauge">จุดวัดระดับน้ำในแม่น้ำ</div><div class="flow-name">${node.stop.name} <span class="flow-role">${node.stop.code} · อ.โพธาราม</span></div><div class="flow-meta">ไม่ได้ติดตาม (ไม่มีข้อมูลอัตโนมัติในระบบนี้)</div></li>`;
+    }
+    if (node.kind === "lower") return lowerNodeHtml(node.g, d ? d.raw : []);
+    if (node.kind === "mouth") return mouthNodeHtml(d ? d.raw : null);
     if (node.kind === "you") {
       return `<li class="flow-node flow-you"><div class="flow-type">พื้นที่ของคุณ</div><div class="flow-name">${node.text}</div></li>`;
     }
@@ -490,6 +527,9 @@
   }
 
   async function nodeData(node) {
+    if (node.kind === "untracked") return {};
+    // Below โพธาราม: the node renderers take the raw history (K.2B, K.57) or the daily summary (MKG006).
+    if (node.kind === "lower" || node.kind === "mouth") return { raw: await getHistory(node.g.file).catch(() => (node.kind === "mouth" ? null : [])) };
     if (node.kind === "dam") {
       const rows = await getHistory(node.res.hourlyFile).catch(() => []);
       const latest = rows[rows.length - 1];
@@ -603,17 +643,12 @@
       <ol class="flow flow-main"><li class="flow-merge">${MERGE_TEXT}</li>${items(MAIN)}</ol>`;
   }
 
-  // ---- Downstream: the Riverline strip and the gauges below โพธาราม (K.2B, K.57, MKG006) ----
-  // The headline, situation card and sticky pill stay about โพธาราม; this is context at the bottom.
+  // ---- Below โพธาราม: K.2B, K.57 and the tidal mouth MKG006, as nodes of the main diagram ----
+  // The headline, situation card and sticky pill stay about โพธาราม; these are context further down the river.
   // No status colour, no alert and no threshold: the bank height is a source-published fact, drawn as
   // a plain labelled line and stated in words. Distances and travel times are the Riverline block in parse.js.
   const BANK_NOTE = "ความสูงตลิ่งตามแหล่งข้อมูล ไม่ใช่เกณฑ์เตือน";
   const TIDE_INFLUENCE_NOTE = "ที่ระดับน้ำต่ำ จุดนี้ขึ้น–ลงตามน้ำทะเลหนุน การแกว่งช่วงน้ำน้อยจึงไม่ใช่สัญญาณน้ำท่วม";
-  const LOWER_GAUGES = [
-    { code: "K.2B", file: "data/k2b.json", name: "สะพานธนะรัชต์", role: "อ.เมืองราชบุรี จ.ราชบุรี" },
-    { code: "K.57", file: "data/k57.json", name: "สะพานบางนกแขวก", role: "อ.บางคนที จ.สมุทรสงคราม", datum: RIVERLINE.stops.find((x) => x.code === "K.57").datum },
-  ];
-  const MOUTH = { code: "MKG006", file: "data/daily-mkg006.json", name: "พระรามสอง", role: "ปากแม่น้ำ อ.เมืองสมุทรสงคราม" };
   const DATUM_UNIT = "ม. ตามเกจ์";
   const datumNote = (d) => `ค่านี้เป็นระดับตามสเกลเกจ์ท้องถิ่น เทียบกับจุดวัดอื่นไม่ได้ (${d.source}ระบุศูนย์เกจ์ ${String(d.zero).replace("-", "−")} ม.)`;
 
@@ -685,48 +720,6 @@
       <div class="flow-group">${range}${lines || `<div class="flow-meta">รอข้อมูลสะสมเพื่อแสดงสูงสุด–ต่ำสุดรายวัน</div>`}</div>
       <div class="flow-group">${freshnessHtml({ asOf: formatShortTime(latest.updatedAt), mins, stale })}</div>
       <div class="flow-remark">ระดับขึ้น–ลงวันละสองครั้ง จึงไม่แสดงลูกศรสูงขึ้น/ลดลง แต่แสดงสูงสุด–ต่ำสุดของแต่ละวัน (ไม่เปลี่ยนตามช่วงเวลาด้านบน)</div></div></div></li>`;
-  }
-
-  // The strip: stops in RID's order, with the link to the next. Untracked stops are kept ("not tracked").
-  function riverlineHtml(strip) {
-    const stopHtml = (s) => {
-      const code = `<span class="flow-role">${s.code === "GULF" ? "" : s.code}</span>`;
-      const name = `<div class="rl-name">${s.name} ${code}</div>`;
-      let read;
-      if (s.state === "reading") {
-        const unit = s.datum ? `${DATUM_UNIT} (ไม่ใช่ ม.รทก.)` : s.code === "SND04" ? "ม.รทก. ที่เขื่อน" : "ม.รทก.";
-        read = `<div class="rl-read"><b>${s.levelMsl.toFixed(2)}</b> <span class="unit">${unit}</span> · <span data-stale="${s.stale}">${formatShortTime(s.updatedAt)}${s.stale ? ` <span class="stale-badge">${STALE_TEXT}</span>` : ""}</span></div>`
-          + (s.datum ? `<div class="rl-sub">${datumNote(s.datum)}</div>` : "")
-          + (s.suspect ? `<div class="rl-sub">${suspectText(s.suspect)}</div>` : "");
-      } else if (s.state === "no-data") read = `<div class="rl-read rl-none">ไม่มีข้อมูลระดับน้ำ</div>`;
-      else if (s.state === "not-tracked") read = `<div class="rl-read rl-none">ไม่ได้ติดตาม (ไม่มีข้อมูลอัตโนมัติในระบบนี้)</div>`;
-      else read = `<div class="rl-read rl-none">ปากแม่น้ำออกสู่ทะเล</div>`;
-      const link = s.kmToNext == null ? ""
-        : `<li class="rl-link" aria-label="ระยะถึงจุดถัดไป">↓ ${s.kmToNext.toLocaleString("en-US")} กม.${s.hoursToNext != null ? ` · กรมชลประทานระบุเดินทางราว ${s.hoursToNext} ชม.` : ""}</li>`;
-      return `<li class="rl-stop" data-state="${s.state}">${name}${read}</li>${link}`;
-    };
-    return `<h3 class="rl-title">แนวลำน้ำจากเขื่อนแม่กลองถึงอ่าวไทย</h3>
-      <ol class="riverline">${strip.map(stopHtml).join("")}</ol>
-      <div class="rl-cap">รวมราว ${RIVERLINE.totalKm} กม. ราว ${RIVERLINE.totalHours} ชม. จากเขื่อนถึงอ่าวไทย (${RIVERLINE.totalSource}) · ระยะทางและเวลาเดินทางทุกตัวเลขเป็นของกรมชลประทาน (${RIVERLINE.source}) มีเวลาเดินทางระบุเพียง 2 ช่วง ที่เหลือไม่มีข้อมูล · ตัวเลขระดับของแต่ละจุดอยู่คนละฐานอ้างอิง อย่าเทียบข้ามจุด</div>`;
-  }
-
-  async function renderDownstream() {
-    const myRender = renderId;
-    const stripEl = document.getElementById("riverline");
-    const gaugesEl = document.getElementById("lower-gauges");
-    if (!stripEl || !gaugesEl) return;
-    const latestOf = async (file) => {
-      const { rows, suspect } = trusted(await getHistory(file).catch(() => []));
-      const last = rows[rows.length - 1];
-      return last && suspect ? { ...last, suspect } : last;
-    };
-    const readings = {};
-    await Promise.all(RIVERLINE.stops.filter((x) => x.file).map(async (x) => (readings[x.code] = await latestOf(x.file))));
-    const lowerRows = await Promise.all(LOWER_GAUGES.map((g) => getHistory(g.file).catch(() => [])));
-    const mouth = await getHistory(MOUTH.file).catch(() => null);
-    if (myRender !== renderId) return;
-    stripEl.innerHTML = riverlineHtml(riverlineStrip(readings, Date.now()));
-    gaugesEl.innerHTML = `<ul class="here-grid lower-grid">${LOWER_GAUGES.map((g, i) => lowerNodeHtml(g, lowerRows[i])).join("")}${mouthNodeHtml(mouth)}</ul>`;
   }
 
   // ---- Collector health: is each automatic source still being collected? ----
@@ -804,14 +797,10 @@
   // Draws everything that follows the Window. Cheap to repeat: history files are cached.
   function renderAll() {
     renderId++;
-    for (const id of ["flow", "stations", "reservoirs", "riverline", "lower-gauges"]) document.getElementById(id).innerHTML = "";
+    for (const id of ["flow", "stations", "reservoirs"]) document.getElementById(id).innerHTML = "";
     renderFlow().catch((err) => {
       console.error(err);
       document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ</div>`;
-    });
-    renderDownstream().catch((err) => {
-      console.error(err);
-      document.getElementById("lower-gauges").innerHTML = `<div class="chart-empty">โหลดข้อมูลท้ายน้ำไม่สำเร็จ</div>`;
     });
     renderInto("stations", STATIONS, loadStation, (s) => stationNameHtml(s.name, s.role));
     // Same order as the river line above: แควใหญ่ (ศรีนครินทร์), then แควน้อย (วชิราลงกรณ).

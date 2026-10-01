@@ -634,7 +634,8 @@ function isStaleReading(updatedAt, nowMs, staleMinutes = 6 * 60) {
   return Number.isNaN(t) || (nowMs - t) / 60000 > staleMinutes;
 }
 
-// The Riverline (see CONTEXT.md): the chain from the Mae Klong Dam to the Gulf. Distances and the two
+// The Riverline (see CONTEXT.md): the chain from the Mae Klong Dam to the Gulf, shown as the distance
+// to the next station on each node of the main diagram. Distances and the two
 // printed travel times are RID's own daily diagram, held here and nowhere else so a revision is one
 // edit. `kmToNext` / `hoursToNext` describe the link to the NEXT stop; `hoursToNext` is set only where
 // RID prints one (two links), never filled in. `file` marks a station we track (its history file);
@@ -657,21 +658,17 @@ const RIVERLINE = {
   ],
 };
 
-// The strip, as data for the markup: every stop in order with its link and its latest reading.
-// `readings` maps a stop code to that station's newest history row ({ levelMsl, updatedAt }).
-// state: "reading" | "no-data" (tracked, nothing usable: never 0) | "not-tracked" | "end".
-function riverlineStrip(readings, nowMs, stops = RIVERLINE.stops) {
-  return stops.map((s) => {
-    const base = { code: s.code, name: s.name, kmToNext: s.kmToNext, hoursToNext: s.hoursToNext, datum: s.datum };
-    if (s.code === "GULF") return { ...base, state: "end", levelMsl: null, updatedAt: null, stale: false };
-    if (!s.file) return { ...base, state: "not-tracked", levelMsl: null, updatedAt: null, stale: false };
-    const r = readings[s.code];
-    const ok = r && typeof r.levelMsl === "number" && Number.isFinite(r.levelMsl);
-    if (!ok) return { ...base, state: "no-data", levelMsl: null, updatedAt: null, stale: false };
-    return { ...base, state: "reading", levelMsl: r.levelMsl, updatedAt: r.updatedAt, stale: isStaleReading(r.updatedAt, nowMs), suspect: r.suspect || null };
-  });
+// The link from a station to the NEXT one on the chain: its name, the km and RID's printed hours
+// (null where RID prints none). Null for the end of the chain or a code not on it. K.56A is on the
+// chain although we do not track it, so the links around it stay whole.
+function riverlineLink(code, stops = RIVERLINE.stops) {
+  const i = stops.findIndex((s) => s.code === code);
+  const from = stops[i];
+  const to = stops[i + 1];
+  if (i < 0 || !to || from.kmToNext == null) return null;
+  return { toCode: to.code, toName: to.name, km: from.kmToNext, hours: from.hoursToNext };
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { suspectLatest, MAX_STEP_M_PER_H, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading, LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { suspectLatest, MAX_STEP_M_PER_H, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineLink, isStaleReading, LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

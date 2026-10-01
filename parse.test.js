@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineStrip, isStaleReading, suspectLatest, MAX_STEP_M_PER_H } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineLink, isStaleReading, suspectLatest, MAX_STEP_M_PER_H } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -1044,47 +1044,22 @@ test("RIVERLINE: K.56A is on the strip but not tracked, K.57 carries its local d
   assert.equal(by.GULF.file, undefined);
 });
 
-const NOW_RL = Date.parse("2026-10-01T23:00:00+07:00");
-const fresh = (levelMsl) => ({ levelMsl, updatedAt: "2026-10-01T22:00:00+07:00" });
-
-test("riverlineStrip: keeps the order, shows an untracked station as not tracked and never drops it", () => {
-  const strip = riverlineStrip({ "K.11A": fresh(12.03), "K.63": fresh(9.67), "K.2B": fresh(4.21), "K.57": fresh(15.12) }, NOW_RL);
-  assert.deepEqual(strip.map((s) => s.code), RIVERLINE.stops.map((s) => s.code));
-  const k56 = strip.find((s) => s.code === "K.56A");
-  assert.equal(k56.state, "not-tracked");
-  assert.equal(k56.levelMsl, null);
-  assert.equal(strip.find((s) => s.code === "GULF").state, "end");
-  assert.equal(strip.find((s) => s.code === "K.2B").state, "reading");
-  assert.equal(strip.find((s) => s.code === "K.2B").levelMsl, 4.21);
+test("riverlineLink: the link from a station to the next one on RID's chain, with the name of that next station", () => {
+  assert.deepEqual(riverlineLink("K.63"), { toCode: "K.55A", toName: "สะพานค่ายหลวง", km: 36.7, hours: 11 });
+  assert.deepEqual(riverlineLink("K.55A"), { toCode: "K.56A", toName: "บ้านสร้อยฟ้า", km: 15.2, hours: 4 });
+  assert.deepEqual(riverlineLink("K.57"), { toCode: "GULF", toName: "อ่าวไทย", km: 23, hours: null });
 });
 
-test("riverlineStrip: a tracked station with no usable reading says no data, never zero", () => {
-  const strip = riverlineStrip({ "K.63": { levelMsl: null, updatedAt: "2026-10-01T22:00:00+07:00" } }, NOW_RL);
-  const k63 = strip.find((s) => s.code === "K.63");
-  assert.equal(k63.state, "no-data");
-  assert.equal(k63.levelMsl, null);
-  assert.equal(strip.find((s) => s.code === "K.55A").state, "no-data");
+test("riverlineLink: a link with no printed time has none (never invented); an untracked station still has its link", () => {
+  assert.equal(riverlineLink("K.2B").hours, null);
+  assert.equal(riverlineLink("K.11A").hours, null);
+  assert.equal(riverlineLink("K.56A").km, 23.55); // K.56A is not tracked but sits on the chain
 });
 
-test("riverlineStrip: a link with no printed time shows none; the two that have one show RID's", () => {
-  const strip = riverlineStrip({}, NOW_RL);
-  const link = (code) => { const s = strip.find((x) => x.code === code); return [s.kmToNext, s.hoursToNext]; };
-  assert.deepEqual(link("K.63"), [36.7, 11]);
-  assert.deepEqual(link("K.55A"), [15.2, 4]);
-  assert.deepEqual(link("K.2B"), [18.3, null]);
-  assert.deepEqual(link("GULF"), [null, null]);
-});
-
-test("riverlineStrip: a reading older than 6 h by the source's own time is flagged stale; fresh ones are not", () => {
-  const strip = riverlineStrip({ "K.2B": { levelMsl: 4.21, updatedAt: "2026-10-01T16:00:00+07:00" }, "K.57": fresh(15.12) }, NOW_RL);
-  assert.equal(strip.find((s) => s.code === "K.2B").stale, true);
-  assert.equal(strip.find((s) => s.code === "K.57").stale, false);
-});
-
-test("riverlineStrip: K.57 passes its datum through so the page can say the reading is not comparable", () => {
-  const k57 = riverlineStrip({ "K.57": fresh(15.12) }, NOW_RL).find((s) => s.code === "K.57");
-  assert.equal(k57.datum.zero, -13.2);
-  assert.equal(riverlineStrip({}, NOW_RL).find((s) => s.code === "K.2B").datum, undefined);
+test("riverlineLink: the end of the chain and an unknown station have no link", () => {
+  assert.equal(riverlineLink("GULF"), null);
+  assert.equal(riverlineLink("K.99"), null);
+  assert.equal(riverlineLink(undefined), null);
 });
 
 // ---- suspectLatest: a display guard against one impossible hour (K.11A 22:00 17.56 -> 23:00 12.03, 2026-10-01) ----
@@ -1126,12 +1101,4 @@ test("suspectLatest: the limit is per hour, so a fast 10-minute gauge is judged 
   assert.equal(suspectLatest(fast), null); // 1.2 m/h
   assert.ok(suspectLatest([fast[0], { updatedAt: "2026-10-01T22:10:00+07:00", levelMsl: 5.5 }])); // 3 m/h
   assert.equal(MAX_STEP_M_PER_H, 2);
-});
-
-test("riverlineStrip: a suspect latest is passed through so the page can say so instead of showing it as the level", () => {
-  const note = { value: 12.03, updatedAt: "2026-10-01T23:00:00+07:00", deltaM: -5.53, hours: 1 };
-  const k11a = riverlineStrip({ "K.11A": { levelMsl: 17.56, updatedAt: "2026-10-01T22:00:00+07:00", suspect: note } }, NOW_RL).find((x) => x.code === "K.11A");
-  assert.equal(k11a.levelMsl, 17.56);
-  assert.deepEqual(k11a.suspect, note);
-  assert.equal(riverlineStrip({ "K.63": fresh(9) }, NOW_RL).find((x) => x.code === "K.63").suspect, null);
 });
