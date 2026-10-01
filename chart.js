@@ -76,7 +76,7 @@
       .map((l) => `<span class="spark-ylab${m.references.some((r) => r.v === l.v) ? " ref" : ""}" data-level="${(m.references.find((r) => r.v === l.v) || {}).level || ""}" style="top:${(l.shownY * 100).toFixed(1)}%">${num(l.v)}</span>`)
       .join("");
     const gapLabels = m.gaps
-      .filter((g) => g.x1 - g.x0 >= MIN_GAP_LABEL)
+      .filter((g) => !g.trailing && g.x1 - g.x0 >= MIN_GAP_LABEL) // a gap running to the right edge is already said by the caption and stale badge
       .map((g) => `<span class="spark-gaplab" style="left:${pct(g.x0)}%;width:${(pct(g.x1) - pct(g.x0)).toFixed(2)}%">ไม่มีข้อมูล ${Math.round(g.hours)} ชม.</span>`)
       .join("");
     const tickLabels = ticks
@@ -101,5 +101,25 @@
       </div>${cover}${scale}${legend}`;
   }
 
+  // A gauge that has readings, but none inside the Window (it went quiet): the same time axis with the
+  // whole span shaded, and no line or vertical scale, since there is nothing to scale. The caption
+  // says it in words. Same opts as renderChart (uses startT, endT, windowH).
+  function renderEmptyChart(opts) {
+    const ticks = axisTicks(opts.startT, opts.endT, opts.windowH).map((k) => ({ ...k, frac: (k.t - opts.startT) / (opts.endT - opts.startT) }));
+    const vGrid = ticks
+      .map((k) => `<line class="spark-grid"${k.midnight ? " data-midnight" : ""} x1="${px(k.frac).toFixed(1)}" y1="0" x2="${px(k.frac).toFixed(1)}" y2="${H}" />`)
+      .join("");
+    const tickLabels = ticks
+      .map((k) => `<span class="tick${k.frac < EDGE_FRAC ? " edge" : ""}"${k.midnight ? " data-midnight" : ""} style="left:${pct(k.frac)}%">${k.midnight ? dayLabel(k.t) : `${String(k.hour).padStart(2, "0")}:00`}</span>`)
+      .join("");
+    return `<div class="spark-plot">
+        <div class="spark-canvas">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${opts.ariaLabel || ""}"><rect class="spark-gap" x="${px(0)}" y="0" width="${px(1) - px(0)}" height="${H}" />${vGrid}</svg>
+        </div>
+        <div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${tickLabels}</div>
+      </div><div class="spark-cover">ไม่มีข้อมูลใน ${opts.windowH} ชม. ล่าสุด</div>`;
+  }
+
   window.renderChart = renderChart;
+  window.renderEmptyChart = renderEmptyChart;
 })();

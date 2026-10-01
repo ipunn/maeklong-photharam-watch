@@ -441,7 +441,7 @@ const CHART_PAD_Y = 0.1;
 const LEVEL_SCALE_STEPS_M = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 5];
 const CHART_SAME_LEVEL_Y = 0.03; // two levels closer than this (as a fraction of the plot height) are the same line
 
-function chartModel(points, { startT, endT, minRange = 0, scaleSteps = null, references = [], referenceProximity = null, maxStepMs = 2 * 3600000 }) {
+function chartModel(points, { startT, endT, minRange = 0, scaleSteps = null, references = [], referenceProximity = null, maxStepMs = 3 * 3600000 }) {
   if (!(endT > startT)) return null; // an axis that does not run forward has nothing to draw
   const pts = points
     .filter((p) => p.t >= startT && p.t <= endT && Number.isFinite(p.v))
@@ -489,7 +489,7 @@ function chartModel(points, { startT, endT, minRange = 0, scaleSteps = null, ref
   const edges = [startT, ...pts.map((p) => p.t), endT];
   for (let i = 1; i < edges.length; i++) {
     if (edges[i] - edges[i - 1] > maxStepMs) {
-      gaps.push({ x0: xOf(edges[i - 1]), x1: xOf(edges[i]), hours: (edges[i] - edges[i - 1]) / 3600000 });
+      gaps.push({ x0: xOf(edges[i - 1]), x1: xOf(edges[i]), hours: (edges[i] - edges[i - 1]) / 3600000, trailing: i === edges.length - 1 });
     }
   }
 

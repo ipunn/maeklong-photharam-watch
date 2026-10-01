@@ -288,6 +288,9 @@
   const TREND_TEXT = { rising: ["▲", "สูงขึ้น"], falling: ["▼", "ลดลง"], steady: ["►", "ทรงตัว"] };
 
   // Gauges: centimetres and cm/hour (people read cm, not "0.13 m"). Dams: m3/s.
+  // Why a box shows no trend: the data is old (a trend from it would read as current), or there is not enough of it.
+  const noTrendText = (d) => (d.stale ? "ไม่แสดงแนวโน้ม เพราะข้อมูลไม่เป็นปัจจุบัน" : `ยังไม่มีข้อมูลย้อนหลัง ${windowH} ชม. พอเทียบแนวโน้ม`);
+
   function trendHtml(t, kind) {
     if (!t) return `<span class="trend" data-dir="none">ยังไม่มีข้อมูลพอเทียบแนวโน้ม</span>`;
     const [arrow, word] = TREND_TEXT[t.direction];
@@ -380,9 +383,13 @@
     const startT = endT - windowHours * 3600000;
     const pts = all.filter((p) => p.t >= startT && p.t <= endT);
     if (pts.length < (shared ? 1 : 2)) {
-      // Readings exist but none in this Window (the gauge went quiet): say so, not "waiting for data".
-      const text = all.length ? `ไม่มีข้อมูลใน ${windowHours} ชม. ล่าสุด` : "รอข้อมูลสะสมเพื่อแสดงกราฟ";
-      return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">${text}</div></div>`;
+      // Readings exist but none in this Window (the gauge went quiet): the empty time axis, shaded, and
+      // say so, never "waiting for data".
+      if (shared && all.length) {
+        const empty = renderEmptyChart({ startT, endT, windowH: windowHours, ariaLabel: label });
+        return `<div class="spark">${compact ? "" : `<div class="spark-label">${label}</div>`}${empty}</div>`;
+      }
+      return `<div class="spark"><div class="spark-label">${label}</div><div class="spark-empty">รอข้อมูลสะสมเพื่อแสดงกราฟ</div></div>`;
     }
     const chart = renderChart({
       points: all, startT, endT, windowH: windowHours, digits, unit, ariaLabel: label, referenceNote: REFERENCE_NOTE,
@@ -440,7 +447,7 @@
         <div class="flow-value"><span class="flow-label">ระบายน้ำลงแม่น้ำ</span> ${release}</div>
         ${d.trend ? `<div class="flow-group"><div class="flow-meta">${trendHtml(d.trend, "dam")}</div></div>` : ""}
         <div class="flow-group">${freshnessHtml(d)}</div>
-        ${d.trend ? "" : `<div class="flow-remark">ยังไม่มีข้อมูลย้อนหลัง ${windowH} ชม. พอเทียบแนวโน้ม</div>`}</div></div></li>`;
+        ${d.trend ? "" : `<div class="flow-remark">${noTrendText(d)}</div>`}</div></div></li>`;
     }
     // "No data yet" messages are remarks in small grey text, apart from the measurements.
     const remarks = [];
@@ -448,7 +455,7 @@
       // A level only: never presented as a release (the release is announced by hand by RID Office 13).
       remarks.push("ไม่มีข้อมูลอัตโนมัติของอัตราระบายและการเปิดบานของเขื่อน ประกาศโดยสำนักงานชลประทานที่ 13");
     }
-    if (!d.trend) remarks.push(`ยังไม่มีข้อมูลย้อนหลัง ${windowH} ชม. พอเทียบแนวโน้ม`);
+    if (!d.trend) remarks.push(noTrendText(d));
     const q = node.kind === "gauge" ? d.latestQ : null;
     if (q) remarks.push("เป็นอัตราการไหลของแม่น้ำที่จุดวัด ไม่ใช่อัตราระบายของเขื่อน");
     // The discharge has its own reading time: say so when it is not the newest row's, and flag it when old.
@@ -482,7 +489,8 @@
       return {
         latest,
         rows,
-        trend: trendOf(rows, "releaseM3s", "reportedAt", windowH, steadyTolerance("release", windowH)),
+        // A stale source gets no trend: a change measured back from an old reading reads as current.
+        trend: mins <= STALE_MINUTES ? trendOf(rows, "releaseM3s", "reportedAt", windowH, steadyTolerance("release", windowH)) : null,
         capacity,
         mins,
         stale: !(mins <= STALE_MINUTES),
@@ -499,9 +507,10 @@
       rows,
       latestQ,
       qStale: !latestQ || !(ageMinutes(latestQ.updatedAt) <= STALE_MINUTES),
-      dischargeTrend: trendOf(rows, "dischargeM3s", "updatedAt", windowH, steadyTolerance("discharge", windowH)),
-      trend: trendOf(rows, "levelMsl", "updatedAt", windowH, steadyTolerance("gauge", windowH)),
-      headlineTrend: trendOf(rows, "levelMsl", "updatedAt", HEADLINE_WINDOW_H, steadyTolerance("gauge", HEADLINE_WINDOW_H)),
+      // Stale readings get no trend (see the dam branch above).
+      dischargeTrend: latestQ && ageMinutes(latestQ.updatedAt) <= STALE_MINUTES ? trendOf(rows, "dischargeM3s", "updatedAt", windowH, steadyTolerance("discharge", windowH)) : null,
+      trend: mins <= STALE_MINUTES ? trendOf(rows, "levelMsl", "updatedAt", windowH, steadyTolerance("gauge", windowH)) : null,
+      headlineTrend: mins <= STALE_MINUTES ? trendOf(rows, "levelMsl", "updatedAt", HEADLINE_WINDOW_H, steadyTolerance("gauge", HEADLINE_WINDOW_H)) : null,
       mins,
       stale: !(mins <= STALE_MINUTES),
       asOf: latest.updatedAt ? formatShortTime(latest.updatedAt) : null,

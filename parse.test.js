@@ -929,3 +929,16 @@ test("isFutureReading: a reading dated well ahead of now is future, a current or
   assert.equal(isFutureReading("2026-10-01T00:20:00+07:00", now), false); // within the 1 h tolerance
   assert.equal(isFutureReading(null, now), false);
 });
+
+test("chartModel: a gap shows only past 3 h, and one running to the right edge is marked trailing", () => {
+  const H = 3600000;
+  const pts = (hs) => hs.map((h) => ({ t: h * H, v: 5 }));
+  const small = chartModel(pts([0, 1, 3.9, 6]), { startT: 0, endT: 6 * H, minRange: 0.1 }); // 2.9 h and 2.1 h steps
+  assert.equal(small.gaps.length, 0);
+  const mid = chartModel(pts([0, 1, 4.5, 6]), { startT: 0, endT: 6 * H, minRange: 0.1 }); // 3.5 h in the middle
+  assert.equal(mid.gaps.length, 1);
+  assert.equal(mid.gaps[0].trailing, false);
+  const end = chartModel(pts([0, 1, 2]), { startT: 0, endT: 6 * H, minRange: 0.1 }); // stops at 2 h, edge at 6 h
+  assert.equal(end.gaps.length, 1);
+  assert.equal(end.gaps[0].trailing, true);
+});
