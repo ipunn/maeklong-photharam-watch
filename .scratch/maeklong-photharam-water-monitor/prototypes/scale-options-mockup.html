@@ -1,0 +1,1936 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock-up: vertical scale of the charts</title>
+<style>
+:root {
+  --bg: #f4f6f9;
+  --card-bg: #ffffff;
+  --text: #1f2937;
+  --text-dim: #6b7280;
+  --border: #e2e6ec;
+  --accent: #3b74c9;
+  --status-red: #d64545;
+  --status-yellow: #e0a021;
+  --status-green: #2f9e6e;
+  --status-neutral: #b4bcc8;
+  --stale-text: #b45309;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  max-width: 820px;
+  margin: 0 auto;
+  font-family: "Noto Sans Thai", "Sarabun", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 16px;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 0 0 20px;
+}
+
+.station-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.station-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.station-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--status-neutral);
+}
+
+.status-dot[data-status="red"] {
+  background: var(--status-red);
+}
+
+.status-dot[data-status="yellow"] {
+  background: var(--status-yellow);
+}
+
+.status-dot[data-status="green"] {
+  background: var(--status-green);
+}
+
+.station-level {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.station-level .unit {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.station-meta {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.station-meta[data-stale="true"] {
+  color: var(--stale-text);
+}
+
+.chart-empty {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.station-role {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin-left: 6px;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  margin: 28px 0 4px;
+}
+
+.reservoir-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.reservoir-stats .unit {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.stat-label {
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 0.85rem;
+  margin-right: 4px;
+}
+
+.notice {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--stale-text);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 24px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+
+.flow {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0 0 0 22px;
+  position: relative;
+}
+
+.flow::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.35;
+  border-radius: 2px;
+}
+
+.flow-node {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.flow-node::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 16px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+
+.flow-gap {
+  border-style: dashed;
+  background: transparent;
+}
+
+.flow-gap::before {
+  background: var(--status-neutral);
+}
+
+.flow-you {
+  border-color: var(--accent);
+}
+
+.flow-you::before {
+  background: var(--status-red);
+}
+
+.flow-name {
+  font-weight: 600;
+}
+
+.flow-branch {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0 7px;
+  margin-right: 4px;
+}
+
+.flow-role {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.flow-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.flow-label {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.flow-value .unit {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.flow-meta {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
+
+.flow-meta[data-stale="true"] {
+  color: var(--stale-text);
+}
+
+.trend[data-dir="rising"] {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.trend[data-dir="falling"] {
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.trend[data-dir="steady"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.howto {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 0 0 20px;
+}
+
+.howto summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.legend {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 0 0 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.legend > div + div {
+  margin-top: 6px;
+}
+
+.flow-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+.flow-stale {
+  border-color: var(--border);
+}
+
+.stale-badge {
+  color: var(--stale-text);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.detail-section {
+  margin-top: 8px;
+}
+
+.detail-section summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.branches {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 16px;
+}
+
+@media (min-width: 760px) {
+  .branches {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .branch {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .branch .flow {
+    flex: 1;
+  }
+}
+
+.branch-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--accent);
+  margin: 0 0 8px;
+}
+
+/* ---- river line: one colour per river, lines run continuously into the merge ---- */
+.flow {
+  --line: var(--accent);
+}
+
+.flow::before {
+  background: var(--line);
+  opacity: 0.6;
+}
+
+.flow-node::before {
+  background: var(--line);
+}
+
+.flow-you::before {
+  background: var(--status-red);
+}
+
+.branch .flow {
+  margin-bottom: 4px;
+}
+
+.branch .flow::before {
+  bottom: 14px;
+}
+
+.flow-end {
+  position: relative;
+  color: var(--line);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0 8px 4px;
+}
+
+.flow-end::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--line);
+  border: 2px solid var(--bg);
+}
+
+.flow-merge {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.flow-merge::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 14px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+
+.flow-main {
+  margin-top: 0;
+}
+
+.flow-main::before {
+  top: -14px;
+}
+
+.branch:last-child .flow {
+  margin-bottom: 0;
+}
+
+.branch:last-child .flow::before {
+  bottom: -14px;
+}
+
+/* phones: comfortable tap/reading sizes, nothing wider than the screen */
+@media (max-width: 480px) {
+  body {
+    padding: 12px;
+  }
+
+  h1 {
+    font-size: 1.15rem;
+  }
+
+  .flow {
+    padding-left: 20px;
+  }
+
+  .flow-node {
+    padding: 10px 12px;
+  }
+
+  .flow-value {
+    font-size: 1.25rem;
+  }
+
+  .legend,
+  .notice {
+    font-size: 0.85rem;
+  }
+}
+
+/* wide screens: a real join — both branch lines run down and meet the trunk */
+@media (min-width: 760px) {
+  .branches {
+    position: relative;
+    padding-bottom: 18px;
+  }
+
+  .branch .flow::before {
+    bottom: -18px;
+  }
+
+  .branches::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: calc(50% - 16px);
+    bottom: 0;
+    height: 3px;
+    background: var(--accent);
+    opacity: 0.6;
+    border-radius: 2px;
+  }
+
+  .flow-main::before {
+    top: -18px;
+  }
+}
+
+/* ---- node layout: text left, trend charts right (stacked below on phones) ---- */
+.flow-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 16px;
+}
+
+@media (min-width: 620px) {
+  .flow-body {
+    grid-template-columns: 1fr 230px;
+    /* A wide column gap keeps the text column (bank bar, its labels) clear of the chart's ticks. */
+    gap: 8px 40px;
+    align-items: start;
+  }
+}
+
+.flow-sparks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spark-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.spark svg {
+  width: 100%;
+  height: 120px; /* was 56 px: too short to read a trend */
+  display: block;
+}
+
+.spark-line {
+  fill: none;
+  stroke: var(--line);
+  vector-effect: non-scaling-stroke;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* zero-length round-capped path = a true circle even though the svg is stretched */
+.spark-dot {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 8;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-cap {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.spark-empty {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  padding: 14px 0;
+}
+
+/* dam capacity: font colour only, on the official Royal Irrigation Dept bands.
+   More than 80-100% (น้ำมาก) = red; over 100% (เกินความจุเก็บกัก) = brighter red.
+   Lower bands are drought categories, shown as plain text. */
+.band {
+  font-weight: 700;
+}
+
+.band[data-band="high"] {
+  color: #b91c1c;
+}
+
+.band[data-band="over"] {
+  color: #e60000;
+}
+
+.band .unit {
+  color: inherit;
+}
+
+.band-tag {
+  font-weight: 700;
+}
+
+.band-tag[data-band="high"] {
+  color: #b91c1c;
+}
+
+.band-tag[data-band="over"] {
+  color: #e60000;
+}
+
+/* the two upstream branches share a row on wide screens, so their cards stay single-column */
+.branch .flow-body {
+  grid-template-columns: 1fr;
+}
+
+.trend-note {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.station-card {
+  --line: var(--accent);
+}
+
+/* hourly ticker under the gauge charts */
+.spark-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-axis {
+  position: relative;
+  height: 1.1rem;
+  margin-top: 2px;
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* phones: keep every hourly tick line, but label every second hour when crowded */
+@media (max-width: 480px) {
+  .spark-axis.dense .tick:nth-of-type(even) {
+    visibility: hidden;
+  }
+}
+
+/* collector health: one plain line; font colour only when it is not healthy */
+.health {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+
+.health-warn {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+/* ---- phones: two rivers must not read as one line ---- */
+.merge-diagram {
+  margin: 4px 0 12px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.merge-diagram .md-top {
+  display: flex;
+  justify-content: space-around;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.merge-diagram svg {
+  width: 100%;
+  height: 46px;
+  display: block;
+}
+
+.merge-diagram path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  opacity: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.merge-diagram .md-bottom {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+@media (max-width: 759px) {
+  /* the diagram above already says the two rivers merge; do not repeat it in the text */
+  .merge-lead {
+    display: none;
+  }
+
+  .branch {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 10px 2px;
+    margin-bottom: 10px;
+  }
+
+  .branch .flow-node {
+    background: var(--bg);
+  }
+}
+
+@media (min-width: 760px) {
+  .merge-diagram {
+    display: none;
+  }
+}
+
+/* collapsed reading guide */
+.howto {
+  margin: 0 0 12px;
+}
+
+.howto ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  line-height: 1.55;
+}
+
+.stations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin: 8px 0 4px;
+}
+
+.stations-table th,
+.stations-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-note {
+  font-size: 0.75rem;
+  margin: 0 0 8px;
+}
+
+/* ---- situation card: the user's own area first ---- */
+.here {
+  margin: 0 0 20px;
+}
+
+.here-sub {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+.here-grid {
+  --line: var(--accent);
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 760px) {
+  .here-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.here-grid .flow-node {
+  margin: 0;
+}
+
+.here-grid .flow-node::before {
+  display: none;
+}
+
+.here-grid .flow-body {
+  grid-template-columns: 1fr;
+}
+
+.here-summary {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.here-more {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+/* ---- hierarchy: the watched area is the main panel; the river line is supporting info ---- */
+.here {
+  background: var(--card-bg);
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 0 0 8px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.here .section-title {
+  font-size: 1.4rem;
+  margin: 0 0 12px;
+}
+
+.here .here-sub {
+  font-size: 0.95rem;
+}
+
+.here .flow-node {
+  background: var(--bg);
+  border: none;
+}
+
+.here .flow-name {
+  font-size: 1.1rem;
+}
+
+.here .flow-value {
+  font-size: 2rem;
+}
+
+.here-summary {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.context {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.context-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.context .section-title {
+  font-size: 1rem;
+  color: var(--text-dim);
+  margin-top: 0;
+}
+
+/* the panel is filled by script; never show an empty bordered card while loading or on failure */
+.here:empty {
+  display: none;
+}
+
+.site-switch {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Daily bar chart (reservoir % of capacity, one bar per day). */
+.bars {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+.bar-col {
+  flex: 1;
+  min-width: 0;
+  max-width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.bar-track {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border);
+}
+.bar {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+  min-height: 1px;
+}
+.bar-col:last-child .bar {
+  opacity: 1;
+}
+.bar-col:not(:last-child) .bar {
+  opacity: 0.55;
+}
+.bar-val,
+.bar-day {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.bar-col:last-child .bar-val {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Level against the bank: a pill (text + shape) and a thin position bar. No severity colour. */
+.bank-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--text-dim);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.bank-pill[data-side="above"],
+.bank-pill[data-side="at"] {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+}
+.bank-bar {
+  position: relative;
+  height: 8px;
+  margin: 8px 0 2px;
+  border-radius: 4px;
+  background: var(--border);
+}
+.bank-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--text-dim);
+  opacity: 0.35;
+}
+.bank-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.bank-dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  border: 2px solid var(--card-bg);
+  box-sizing: border-box;
+}
+.bank-dot[data-side="above"] {
+  background: var(--text);
+}
+.bank-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+/* The page's own alert (level >= 1 m above the bank). Always paired with text saying it is not an official threshold. */
+.bank-pill[data-alert="true"] {
+  background: var(--status-red);
+  border-color: var(--status-red);
+  color: #fff;
+}
+.flow-alert {
+  border-color: var(--status-red);
+  box-shadow: 0 0 0 1px var(--status-red);
+}
+.alert-note,
+.alert-banner {
+  color: var(--status-red);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.alert-note .unit,
+.alert-banner .unit {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+.alert-banner {
+  border: 1.5px solid var(--status-red);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+/* A subtle, permanent remark: no box, no colour, just small grey text. */
+.remark {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin: -6px 0 10px;
+}
+
+/* Card rhythm: metric groups are spaced apart; explanations sit apart in small grey "remark" text. */
+.flow-group {
+  margin-top: 10px;
+}
+.flow-group .flow-meta:first-child {
+  margin-top: 0;
+}
+.flow-remark {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.bank-scale {
+  margin-bottom: 4px;
+}
+.flow-sparks {
+  margin-top: 6px;
+}
+
+/* Window toggle: stays in view while scrolling so every box can be compared at one span */
+.window-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.wt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wt-label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.wt-buttons {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card-bg);
+}
+.wt-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.wt-btn:last-child {
+  border-right: 0;
+}
+.wt-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.wt-note {
+  margin: 4px 0 8px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* 24 h axes cross midnight: the date label replaces the clock label and its grid line is firmer */
+.tick[data-midnight] {
+  font-weight: 700;
+  color: var(--text);
+}
+.spark-grid[data-midnight] {
+  stroke: var(--text-dim);
+}
+/* the box has less data than the chosen Window */
+.spark-cover {
+  font-size: 0.75rem;
+  color: var(--stale-text);
+}
+
+/* phones: thumb-sized toggle buttons */
+@media (max-width: 480px) {
+  .wt-btn {
+    min-height: 44px;
+    padding: 0 16px;
+  }
+}
+
+/* chart (chart.js): a labelled vertical scale, shaded gaps, a dashed reference line */
+.spark-plot {
+  margin-left: 2.7rem; /* the left margin carries the scale labels */
+}
+.spark-canvas {
+  position: relative;
+}
+.spark-ylab,
+.spark-yunit {
+  position: absolute;
+  right: calc(100% + 5px);
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.spark-ylab {
+  transform: translateY(-50%);
+}
+.spark-ylab.ref {
+  color: var(--text);
+  font-weight: 700;
+}
+.spark-yunit {
+  top: 0.15rem;
+}
+.spark-hgrid {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.spark-ref {
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+.spark-gap {
+  fill: rgba(180, 83, 9, 0.1);
+}
+.spark-gaplab {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--stale-text);
+  pointer-events: none;
+}
+.spark-dot-small {
+  stroke-width: 5;
+}
+.spark-legend {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.spark-legend-line {
+  display: inline-block;
+  width: 1.4rem;
+  border-top: 2px dashed var(--text);
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* a unit stays on the line with its number ("2,141 ลบ.ม./วินาที" must not split) */
+.flow-value .unit {
+  white-space: nowrap;
+}
+
+/* the river-flow figure is long ("อัตราการไหลของแม่น้ำ ≈ 2,141 ลบ.ม./วินาที"): label above, number and unit together below */
+.flow-q .flow-label {
+  display: block;
+}
+
+.tick.edge {
+  visibility: hidden;
+}
+
+/* Photharam's own reference lines (the page's, not official). Yellow, amber, red; each is also named in words. */
+.spark-ref[data-level="yellow"] { stroke: #e0a800; }
+.spark-ref[data-level="amber"] { stroke: #ef6c00; }
+.spark-ref[data-level="red"] { stroke: #d50000; stroke-width: 2.5; }
+.spark-ylab.ref[data-level="yellow"] { color: #9a7400; }
+.spark-ylab.ref[data-level="amber"] { color: #c25400; }
+.spark-ylab.ref[data-level="red"] { color: #d50000; }
+.spark-legend-item { white-space: nowrap; margin-right: 8px; }
+.spark-legend-line[data-level="yellow"] { border-top-color: #e0a800; }
+.spark-legend-line[data-level="amber"] { border-top-color: #ef6c00; }
+.spark-legend-line[data-level="red"] { border-top-color: #d50000; border-top-width: 3px; }
+
+/* with reference lines the chart is taller, so the lines and their labels have room */
+.spark-plot[data-tall] svg {
+  height: 150px;
+}
+
+body { max-width: none; }
+h1 { font-size: 1.15rem; }
+.note { color: var(--text-dim); font-size: .85rem; max-width: 64rem; }
+.controls { margin: 12px 0 14px; }
+table.cmp { border-collapse: separate; border-spacing: 14px 10px; }
+table.cmp th { text-align: left; vertical-align: top; font-size: .9rem; max-width: 330px; }
+table.cmp th small { display: block; font-weight: 400; color: var(--text-dim); font-size: .75rem; margin-top: 2px; }
+table.cmp td { vertical-align: top; width: 330px; padding: 0; }
+td.gname { width: 150px !important; font-weight: 700; font-size: .85rem; }
+td.gname small { display: block; font-weight: 400; color: var(--text-dim); font-size: .75rem; }
+.cell { --line: var(--accent); background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px 6px; }
+.cell .h { font-size: .74rem; color: var(--text-dim); margin-top: 2px; }
+.cell .h b { color: var(--text); }
+.spark svg { height: 90px; }
+</style></head><body>
+<h1>Mock-up: should every chart use the same vertical scale?</h1>
+<p class="note">Today's real readings for the river-line gauges. Each row is one gauge; each column is one way of choosing the chart's height in metres. Under each chart: how many metres the whole chart height stands for. Reference lines are left out here so only the scale question shows. Nothing here is on the live site.</p>
+<div class="controls"><div class="wt-buttons" id="wins">
+  <button class="wt-btn" data-h="6" aria-pressed="false">6 ชม.</button>
+  <button class="wt-btn" data-h="12" aria-pressed="true">12 ชม.</button>
+  <button class="wt-btn" data-h="24" aria-pressed="false">24 ชม.</button></div></div>
+<div id="out"></div>
+<script>
+// Pure, source-agnostic parsing/derivation logic — no network, no DOM.
+// The scrape script (scripts/scrape-waterlevel.js) and the site (app.js) are both thin
+// I/O wrappers around these functions; only these are unit tested.
+
+// ThaiWater's `waterlevel_datetime` (and similar fields elsewhere in this
+// app) come back as a naive "YYYY-MM-DD HH:MM" string with no timezone
+// marker, but the value is always Bangkok local time. Treating it as the
+// runtime's local time instead would silently shift it by the runtime's own
+// UTC offset — this makes the Bangkok offset explicit instead.
+function toIsoBangkok(naive) {
+  if (!naive) return null;
+  const str = String(naive).replace(" ", "T");
+  const withSeconds = /T\d\d:\d\d:\d\d$/.test(str) ? str : `${str}:00`;
+  return /[Zz]|[+-]\d\d:?\d\d$/.test(withSeconds) ? withSeconds : `${withSeconds}+07:00`;
+}
+
+// A station is deliberately NOT report-shaped (no passability status, no
+// road-report fields) — this app has no concept of a road report at all.
+function parseWaterLevelRecord(raw) {
+  const station = raw.station || {};
+  const warningM = station.warning_level_m;
+  const criticalM = station.critical_level_m;
+  const thresholds =
+    warningM != null && criticalM != null ? { warningM: Number(warningM), criticalM: Number(criticalM) } : null;
+
+  return {
+    stationId: station.id,
+    name: (station.tele_station_name && station.tele_station_name.th) || null,
+    levelMsl: raw.waterlevel_msl != null ? Number(raw.waterlevel_msl) : null,
+    bankMsl: station.min_bank != null ? Number(station.min_bank) : null,
+    updatedAt: toIsoBangkok(raw.waterlevel_datetime),
+    thresholds,
+    // Only some gauges (e.g. C.13) carry a discharge; the feed sends it as a string.
+    dischargeM3s: strictNumberOrNull(raw.discharge),
+  };
+}
+
+// Like Number(), but blank/whitespace/non-numeric become null — Number("") is 0, and a
+// missing discharge must never read as "no flow".
+function strictNumberOrNull(v) {
+  if (v == null || (typeof v === "string" && v.trim() === "")) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Where a level sits against the bank, as a fact (not a Status, not a flood level).
+// Null when either input is missing. Difference is in metres, 2 dp, always >= 0.
+function bankComparison(levelMsl, bankMsl) {
+  const ok = (v) => typeof v === "number" && Number.isFinite(v);
+  if (!ok(levelMsl) || !ok(bankMsl)) return null;
+  const diffM = Math.round(Math.abs(levelMsl - bankMsl) * 100) / 100;
+  const direction = diffM === 0 ? "at" : levelMsl > bankMsl ? "above" : "below";
+  return { direction, diffM };
+}
+
+// One entry per Bangkok calendar day: the day's high and low (with the source times of each).
+// Days come from the source's `updatedAt`, never `scrapedAt`. Rows with a non-numeric level or
+// unreadable time are ignored. The day containing `nowMs` is still filling, so it is marked
+// `partial`. Bangkok has no DST, so the fixed +7 h offset is exact.
+function dailyHighLow(rows, nowMs) {
+  const BKK_MS = 7 * 3600000;
+  const dayOf = (ms) => new Date(ms + BKK_MS).toISOString().slice(0, 10);
+  const today = dayOf(nowMs);
+  const days = new Map();
+  for (const r of rows) {
+    const ms = new Date(r.updatedAt).getTime();
+    if (Number.isNaN(ms) || typeof r.levelMsl !== "number" || !Number.isFinite(r.levelMsl)) continue;
+    const date = dayOf(ms);
+    const d = days.get(date) || { date, high: -Infinity, highAt: null, low: Infinity, lowAt: null, partial: date === today };
+    if (r.levelMsl > d.high) (d.high = r.levelMsl), (d.highAt = r.updatedAt);
+    if (r.levelMsl < d.low) (d.low = r.levelMsl), (d.lowAt = r.updatedAt);
+    days.set(date, d);
+  }
+  return [...days.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+// Bands a station's current level against its own sourced thresholds.
+// Deliberately never defaults to "green"/any color when no threshold is
+// known — an unsourced guess is worse than no color at all.
+function deriveStatus(levelMsl, thresholds) {
+  if (!thresholds) return null;
+  // A missing level must never be banded: `null < x` is true in JS and would read as green.
+  if (typeof levelMsl !== "number" || !Number.isFinite(levelMsl)) return null;
+  if (levelMsl < thresholds.warningM) return "green";
+  if (levelMsl < thresholds.criticalM) return "yellow";
+  return "red";
+}
+
+// EGAT's water_crisis.php is one big server-rendered table, one <tr> per dam.
+// Tracked dams are matched by their Thai name (never by row position — the
+// page's row order and the other dams' rows are not ours to depend on).
+const TRACKED_RESERVOIRS = ["วชิราลงกรณ", "ศรีนครินทร์"];
+// Column offsets among the cells after the name cell.
+const RESERVOIR_COL = { levelMsl: 0, storageMcm: 1, storagePercent: 2, releaseMcmPerDay: 10 };
+
+function cellNumber(text) {
+  const n = Number(text.replace(/,/g, ""));
+  return text !== "" && Number.isFinite(n) ? n : null;
+}
+
+// `raw` is the page's HTML. Returns one record per tracked dam found; a dam
+// with no row is omitted (the caller decides how to report the gap). The page
+// reports release in MCM/day; it is converted here to m3/s (2 dp) so the whole
+// UI uses one unit. The page has no per-row timestamp — that is the scraper's.
+function parseReservoirRecord(raw) {
+  const records = [];
+  for (const [, rowHtml] of String(raw).matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(([, c]) =>
+      c.replace(/<[^>]*>/g, "").trim(),
+    );
+    const name = cells[0];
+    if (!TRACKED_RESERVOIRS.includes(name)) continue;
+    const values = cells.slice(1).map(cellNumber);
+    const mcmPerDay = values[RESERVOIR_COL.releaseMcmPerDay];
+    records.push({
+      name,
+      storageMcm: values[RESERVOIR_COL.storageMcm] ?? null,
+      storagePercent: values[RESERVOIR_COL.storagePercent] ?? null,
+      levelMsl: values[RESERVOIR_COL.levelMsl] ?? null,
+      releaseRateM3s: mcmPerDay == null ? null : Math.round(((mcmPerDay * 1e6) / 86400) * 100) / 100,
+    });
+  }
+  return records;
+}
+
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
+// The EGAT page is a daily report, headed e.g. "28 กันยายน 2569 เวลา 24.00 น."
+// (Buddhist year; 24.00 == end of that day). That is the time the figures
+// are AS OF — not when we scraped — so the UI must age them from here.
+// Returns null when the header isn't recognisable: never guess a date.
+function parseReservoirReportDate(raw) {
+  const m = String(raw).match(/(\d{1,2})\s+(\S+)\s+(\d{4})\s+เวลา\s+(\d{1,2})[.:](\d{2})/);
+  if (!m) return null;
+  const month = THAI_MONTHS.indexOf(m[2]);
+  if (month < 0) return null;
+  // The page uses the Buddhist era. A year that is not plausibly Buddhist is unrecognised.
+  if (Number(m[3]) < 2400) return null;
+  const year = Number(m[3]) - 543;
+  // An impossible date (e.g. 31 September) is unrecognised, not silently rolled over.
+  const day = new Date(Date.UTC(year, month, Number(m[1])));
+  if (day.getUTCMonth() !== month || day.getUTCDate() !== Number(m[1])) return null;
+  // Date.UTC rolls hour 24 over to 00:00 of the next day for us.
+  const bangkokAsUtc = new Date(Date.UTC(year, month, Number(m[1]), Number(m[4]), Number(m[5])));
+  const p = (n) => String(n).padStart(2, "0");
+  return (
+    `${bangkokAsUtc.getUTCFullYear()}-${p(bangkokAsUtc.getUTCMonth() + 1)}-${p(bangkokAsUtc.getUTCDate())}` +
+    `T${p(bangkokAsUtc.getUTCHours())}:${p(bangkokAsUtc.getUTCMinutes())}:00+07:00`
+  );
+}
+
+const numOrNull = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+
+// One `dam_hourly` record from ThaiWater's dam feed. Inflow/release are million
+// m3 over the hour ending at `dam_date` (unit high confidence, per-hour basis
+// medium — see .scratch/maeklong-photharam-water-monitor/research/thaiwater-dam-feed-units.md),
+// so m3/s is MCM * 1e6 / 3600. Unlike EGAT's daily table this has its own
+// hourly timestamp. A missing value stays null — never 0.
+function parseDamHourlyRecord(raw) {
+  const dam = raw.dam || {};
+  const releaseMcm = numOrNull(raw.dam_released);
+  return {
+    damId: dam.id,
+    name: (dam.dam_name && dam.dam_name.th) || null,
+    levelMsl: numOrNull(raw.dam_level),
+    storageMcm: numOrNull(raw.dam_storage),
+    inflowMcm: numOrNull(raw.dam_inflow),
+    releaseMcm,
+    releaseM3s: releaseMcm == null ? null : Math.round((releaseMcm * 1e6) / 3600),
+    reportedAt: toIsoBangkok(raw.dam_date),
+  };
+}
+
+// The feed holds stale rows for some dams alongside current ones, so pick the
+// newest record for the given dam id rather than the first match.
+function pickLatestDamHourly(records, damId) {
+  let best = null;
+  for (const r of records) {
+    if (!r.dam || r.dam.id !== damId) continue;
+    if (!best || String(r.dam_date) > String(best.dam_date)) best = r;
+  }
+  return best;
+}
+
+// Hourly stored volume as a % of capacity. Capacity is backed out of EGAT's own row
+// (storage MCM / storage %) because ThaiWater's dam_storage_percent is 0 for these
+// dams. Null if any input is missing — no capacity is ever assumed.
+function damCapacity(hourlyStorageMcm, egatStorageMcm, egatStoragePercent) {
+  const ok = (v) => typeof v === "number" && Number.isFinite(v) && v > 0;
+  if (!ok(hourlyStorageMcm) || !ok(egatStorageMcm) || !ok(egatStoragePercent)) return null;
+  const capacityMcm = egatStorageMcm / (egatStoragePercent / 100);
+  return {
+    capacityMcm,
+    percent: (hourlyStorageMcm / capacityMcm) * 100,
+    remainingMcm: Math.max(0, capacityMcm - hourlyStorageMcm),
+  };
+}
+
+// Official reservoir-storage status bands by % of capacity (Royal Irrigation
+// Department criteria, as printed in ThaiWater's report notes). Lower bounds are
+// exclusive: exactly 80% is น้ำปานกลาง, exactly 100% is น้ำมาก.
+function reservoirBand(percent) {
+  if (typeof percent !== "number" || !Number.isFinite(percent)) return null;
+  if (percent > 100) return { key: "over", label: "เกินความจุเก็บกัก" };
+  if (percent > 80) return { key: "high", label: "น้ำมาก" };
+  if (percent > 50) return { key: "medium", label: "น้ำปานกลาง" };
+  if (percent > 30) return { key: "low", label: "น้ำน้อย" };
+  return { key: "critical-low", label: "น้ำน้อยวิกฤต" };
+}
+
+// True when `next` carries the same source values as the last stored row, ignoring
+// when we scraped it. Used so an unchanged reading is not appended every 15 minutes.
+function isSameReading(prev, next) {
+  if (!prev) return false;
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  keys.delete("scrapedAt");
+  for (const k of keys) if (prev[k] !== next[k]) return false;
+  return true;
+}
+
+// Is the automatic collector alive? Uses the newest `scrapedAt` (when WE last ran)
+// across all data files, which is separate from how old the SOURCE data is.
+// "unknown" when no usable timestamp exists — never claims the collector is fine.
+function collectorHealth(scrapedAts, nowMs, warnMinutes) {
+  let latestMs = -Infinity;
+  let latest = null;
+  for (const iso of scrapedAts) {
+    const ms = new Date(iso).getTime();
+    if (!Number.isNaN(ms) && ms > latestMs) {
+      latestMs = ms;
+      latest = iso;
+    }
+  }
+  if (latest === null) return { status: "unknown", latest: null, ageMinutes: null };
+  const ageMinutes = (nowMs - latestMs) / 60000;
+  return { status: ageMinutes > warnMinutes ? "stale" : "ok", latest, ageMinutes };
+}
+
+// One point per SOURCE timestamp, oldest first (repeated scrapes of one unchanged
+// reading collapse to a single point).
+// How a series moved, using only the readings we have. `timeKey` is the SOURCE's
+// own timestamp (repeated scrapes of one unchanged reading collapse to one point).
+// Compares the newest reading with the oldest one still inside `windowHours`, and
+// reports the real span so the UI never claims "3 h" when only 1 h of data exists.
+// Returns null when there aren't two distinct readings: no data, no trend.
+function seriesOf(rows, valueKey, timeKey) {
+  const byTime = new Map();
+  for (const r of rows) {
+    const t = new Date(r[timeKey]).getTime();
+    if (!Number.isNaN(t) && typeof r[valueKey] === "number") byTime.set(t, r[valueKey]);
+  }
+  return [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => ({ t, v }));
+}
+
+const WINDOW_TOLERANCE_MS = 60 * 60000;
+
+function trendOf(rows, valueKey, timeKey, windowHours, tolerance) {
+  const points = seriesOf(rows, valueKey, timeKey).map((p) => [p.t, p.v]);
+  if (points.length < 2) return null;
+  const [latestT, latestV] = points[points.length - 1];
+  const cutoff = latestT - windowHours * 3600000;
+  // Every box compares over the same window: the reading nearest to `windowHours`
+  // back, within ±1 h. A shorter/longer span reads as "not enough data" rather
+  // than a differently-sized box that cannot be compared with its neighbours.
+  const candidates = points.filter(([t]) => t < latestT && Math.abs(t - cutoff) <= WINDOW_TOLERANCE_MS);
+  if (!candidates.length) return null;
+  const first = candidates.reduce((a, b) => (Math.abs(b[0] - cutoff) < Math.abs(a[0] - cutoff) ? b : a));
+  const delta = latestV - first[1];
+  const prevV = points[points.length - 2][1];
+  return {
+    delta,
+    // The newest step on its own: the net change can hide a late reversal.
+    lastDelta: latestV - prevV,
+    spanHours: (latestT - first[0]) / 3600000,
+    direction: Math.abs(delta) <= tolerance ? "steady" : delta > 0 ? "rising" : "falling",
+  };
+}
+
+// What the tide hides and a flood shows: the latest FULL Bangkok day's tidal range, and how its
+// high and low moved against the day before (a tide swing cancels out; a real rise lifts both).
+// The change is null unless the previous entry is exactly the day before. Null with no full day.
+function tideTrend(days) {
+  const full = days.filter((d) => !d.partial);
+  if (!full.length) return null;
+  const last = full[full.length - 1];
+  const prev = full[full.length - 2];
+  const dayBefore = new Date(new Date(`${last.date}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10);
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const adjacent = prev && prev.date === dayBefore;
+  return {
+    date: last.date,
+    rangeM: round2(last.high - last.low),
+    highDeltaM: adjacent ? round2(last.high - prev.high) : null,
+    lowDeltaM: adjacent ? round2(last.low - prev.low) : null,
+  };
+}
+
+// This site's OWN alert rule, chosen by the maintainer (not an official threshold, and not a
+// source-published one, so it is never written into Status): true when the level is at least
+// `marginM` above the bank height. False, never true, when either input is missing.
+function aboveBankAlert(levelMsl, bankMsl, marginM) {
+  const c = bankComparison(levelMsl, bankMsl);
+  return c !== null && c.direction === "above" && Math.round((levelMsl - bankMsl) * 100) >= Math.round(marginM * 100);
+}
+
+// One value per Bangkok day from a series of reports, newest `maxDays` days, oldest first.
+// A report stamped exactly midnight (EGAT's daily table, "24.00 น.") is the end of the day that
+// just finished, so its day is the minute before. Where a day has several reports the one with
+// the newest source time wins. Non-numeric values and unreadable times are ignored.
+function dailyValues(rows, valueKey, timeKey, maxDays = 7) {
+  const BKK_MS = 7 * 3600000;
+  const byDay = new Map();
+  for (const r of rows) {
+    const ms = new Date(r[timeKey]).getTime();
+    if (r[timeKey] == null || Number.isNaN(ms) || typeof r[valueKey] !== "number" || !Number.isFinite(r[valueKey])) continue;
+    const date = new Date(ms - 60000 + BKK_MS).toISOString().slice(0, 10);
+    const prev = byDay.get(date);
+    if (!prev || ms >= prev.ms) byDay.set(date, { ms, v: r[valueKey] });
+  }
+  return [...byDay.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .slice(-maxDays)
+    .map(([date, { v }]) => ({ date, v }));
+}
+
+// A Site is a watched place with its own gauges and page (see CONTEXT.md). Every tracked
+// river gauge belongs to exactly one Site; the Collector serves them all in one run.
+const SITES = ["maeklong", "bangkruai"];
+
+// Tracked river gauges, by ThaiWater station id, upstream to downstream within a Site.
+// All verified against the live feed (the spec's original id 505018 turned out to be K.58
+// บ้านปากแซง on the แควน้อย, which is used as a far-upstream gauge): 505018 K.58,
+// 2679 K.11A บ้านวังขนาย, 832066 K.55A สะพานค่ายหลวง, 710 โพธาราม.
+const TRACKED_STATIONS = [
+  { id: 505018, file: "pak-saeng.json", site: "maeklong" },
+  // K.37 บ้านวังเย็น (อ.ด่านมะขามเตี้ย): reports a discharge. Above the Mae Klong Dam by level
+  // (31.77 m MSL against the dam's 22.76), so it sits before the Barrage in the river line.
+  { id: 2571, file: "k37.json", site: "maeklong" },
+  { id: 2679, file: "wang-khanai.json", site: "maeklong" },
+  { id: 832066, file: "khai-luang.json", site: "maeklong" },
+  { id: 710, file: "photharam.json", site: "maeklong" },
+  // Bang Kruai Site (proxy gauges; ids re-verified by name against the live feed 2026-09-29).
+  // `tidal` is configuration, not inferred: tidal gauges get a daily high/low, not a trend.
+  // `summary` is the small per-gauge file the page reads instead of the full 10-minute history.
+  { id: 5, file: "bkk003.json", summary: "daily-bkk003.json", site: "bangkruai", tidal: true }, // BKK003 คลองมหาสวัสดิ บางกรวย-สวนผัก
+  { id: 2599, file: "c12.json", summary: "daily-c12.json", site: "bangkruai", tidal: true }, // C.12 สามเสน
+  { id: 26, file: "cpy014.json", summary: "daily-cpy014.json", site: "bangkruai", tidal: true }, // CPY014 สะพานนวลฉวี ปากเกร็ด
+  { id: 4, file: "cpy015.json", summary: "daily-cpy015.json", site: "bangkruai", tidal: true }, // CPY015 สะพานกรุงเทพ
+  { id: 2744, file: "c13.json", summary: "daily-c13.json", site: "bangkruai", tidal: false }, // C.13 ท้ายเขื่อนเจ้าพระยา
+];
+
+// Stations ThaiWater serves only through the per-station `waterlevel_graph`, not the bulk
+// `waterlevel_load`. `graphType` is that endpoint's station_type. Ids checked against the live
+// station catalogue 2026-09-30 (.scratch/**/research/mae-klong-dam-data-sources.md).
+const GRAPH_STATIONS = [
+  { id: 700554, file: "barrage-snd04.json", site: "maeklong", graphType: "tele_waterlevel" }, // เขื่อนแม่กลอง (EGAT SND04): the Barrage, level only
+  { id: 4007644, file: "k63.json", site: "maeklong", graphType: "tele_waterlevel" }, // K.63 บ้านใหม่, 4.26 km below K.11A: level and discharge
+];
+
+function stationsForSite(site) {
+  return TRACKED_STATIONS.filter((s) => s.site === site);
+}
+
+// The Window: one span, in hours, for every hourly chart and trend on a page. The URL
+// (`?window=12`, so a link can carry a view) beats the stored choice, which beats the default.
+// A value that is not one of WINDOWS_H is ignored, never trusted.
+const WINDOWS_H = [6, 12, 24];
+const DEFAULT_WINDOW_H = 6;
+
+function resolveWindow(search, stored) {
+  const fromUrl = Number(new URLSearchParams(search || "").get("window"));
+  const fromStore = Number(stored);
+  if (WINDOWS_H.includes(fromUrl)) return fromUrl;
+  if (WINDOWS_H.includes(fromStore)) return fromStore;
+  return DEFAULT_WINDOW_H;
+}
+
+// When a trend reads "steady", per Window: a longer span lets a small drift add up, so it
+// tolerates more. Gauge in metres; release in m3/s. PLACEHOLDERS for the maintainer to tune
+// (24 h gauge = the old long-view value; release scaled from the old 10 m3/s at the same ratio).
+// Discharge is in m3/s too.
+const STEADY_TOLERANCE = {
+  gauge: { 6: 0.03, 12: 0.04, 24: 0.05 },
+  release: { 6: 10, 12: 13, 24: 17 },
+  // River flow at K.37 / K.63 / K.55A runs around 2,000 m3/s, where 10 m3/s is noise. PLACEHOLDER,
+  // about 2.5 % of that flow at 6 h, for the maintainer to tune.
+  discharge: { 6: 50, 12: 75, 24: 100 },
+};
+
+function steadyTolerance(kind, windowH) {
+  const table = STEADY_TOLERANCE[kind];
+  return table[windowH] ?? table[DEFAULT_WINDOW_H];
+}
+
+// Time-axis ticks for a Window: every 1 / 2 / 4 h for 6 / 12 / 24 h, on whole Bangkok clock
+// hours that are multiples of the step (so every box shares the same ticks). Bangkok is
+// UTC+7, a whole-hour offset. `midnight` marks the date change, which a 24 h axis crosses.
+const TICK_STEP_H = { 6: 1, 12: 2, 24: 4 };
+
+function axisTicks(t0, tN, windowH) {
+  const HOUR = 3600000;
+  const step = TICK_STEP_H[windowH] ?? TICK_STEP_H[DEFAULT_WINDOW_H];
+  const ticks = [];
+  for (let t = Math.ceil(t0 / HOUR) * HOUR; t <= tN; t += HOUR) {
+    const hour = (Math.floor(t / HOUR) + 7) % 24;
+    if (hour % step === 0) ticks.push({ t, hour, midnight: hour === 0 });
+  }
+  return ticks;
+}
+
+// "YYYY-MM-DD" in Bangkok for a moment, `daysAgo` calendar days back. Bangkok is UTC+7 with no DST,
+// so the fixed offset is exact. Used for the date range asked of the per-station graph feed.
+function bangkokDate(ms, daysAgo) {
+  return new Date(ms + 7 * 3600000 - daysAgo * 86400000).toISOString().slice(0, 10);
+}
+
+// Everything a small time-series chart draws, as numbers, so both pages draw the same thing.
+// x is 0..1 across [startT, endT]; y is 0..1 from the TOP (larger values higher). `points` are
+// { t: ms, v } and only those inside the Window count. The vertical scale is the data's own min and
+// max (labelled by the caller), widened to `minRange` so a 1 cm wiggle does not look like a collapse,
+// and widened again to include every `references[].v` (levels the page marks) so the distance to
+// them shows (optionally only the ones near the readings, see `referenceProximity`). Extra keys on a
+// reference (a name, a colour key) are passed through untouched.
+// A stretch longer than `maxStepMs` between readings is a GAP: the line breaks there instead of a
+// straight line crossing hours nobody measured, and the gap is reported (leading, internal or trailing).
+// Null when no point is in the Window.
+const CHART_PAD_Y = 0.1;
+const CHART_SAME_LEVEL_Y = 0.03; // two levels closer than this (as a fraction of the plot height) are the same line
+
+function chartModel(points, { startT, endT, minRange = 0, references = [], referenceProximity = null, maxStepMs = 2 * 3600000 }) {
+  if (!(endT > startT)) return null; // an axis that does not run forward has nothing to draw
+  const pts = points
+    .filter((p) => p.t >= startT && p.t <= endT && Number.isFinite(p.v))
+    .sort((a, b) => a.t - b.t);
+  if (!pts.length) return null;
+  const xOf = (t) => (t - startT) / (endT - startT);
+  // With `referenceProximity` (same unit as v) a reference is used only when it lies within that
+  // distance of the readings in the Window (inside their range, or up to that far above or below it):
+  // a line the water is nowhere near takes no space, and comes into view as the water approaches.
+  const dataMin = Math.min(...pts.map((p) => p.v));
+  const dataMax = Math.max(...pts.map((p) => p.v));
+  references = references.filter(
+    (r) => Number.isFinite(r.v) && (referenceProximity === null || (r.v >= dataMin - referenceProximity && r.v <= dataMax + referenceProximity)),
+  );
+  const refVals = references.map((r) => r.v);
+
+  let min = Math.min(...pts.map((p) => p.v), ...refVals);
+  let max = Math.max(...pts.map((p) => p.v), ...refVals);
+  const range = Math.max(minRange, 1e-6); // never zero: a flat line must not divide by zero
+  if (max - min < range) {
+    const mid = (min + max) / 2;
+    min = mid - range / 2;
+    max = mid + range / 2;
+  }
+  const yOf = (v) => CHART_PAD_Y + (1 - 2 * CHART_PAD_Y) * ((max - v) / (max - min));
+
+  const segments = [];
+  let run = [];
+  pts.forEach((p, i) => {
+    if (i && p.t - pts[i - 1].t > maxStepMs) {
+      segments.push(run);
+      run = [];
+    }
+    run.push({ x: xOf(p.t), y: yOf(p.v) });
+  });
+  segments.push(run);
+
+  const gaps = [];
+  const edges = [startT, ...pts.map((p) => p.t), endT];
+  for (let i = 1; i < edges.length; i++) {
+    if (edges[i] - edges[i - 1] > maxStepMs) {
+      gaps.push({ x0: xOf(edges[i - 1]), x1: xOf(edges[i]), hours: (edges[i] - edges[i - 1]) / 3600000 });
+    }
+  }
+
+  const refPoints = references.filter((r) => Number.isFinite(r.v)).map((r) => ({ ...r, y: yOf(r.v) }));
+  // Labels for the scale's two ends; each reference gets its own. An end label is dropped only when it
+  // IS a reference (a reference is the highest or lowest value); one that is merely close stays, and
+  // the renderer spaces the labels apart.
+  const ends = [{ v: max, y: yOf(max) }, { v: min, y: yOf(min) }].filter((l) => !refPoints.some((r) => Math.abs(l.y - r.y) <= CHART_SAME_LEVEL_Y));
+  const yLabels = [...refPoints, ...ends].sort((a, b) => a.y - b.y);
+
+  const lastPt = pts[pts.length - 1];
+  return {
+    segments,
+    gaps,
+    missingHours: gaps.reduce((sum, g) => sum + g.hours, 0),
+    min,
+    max,
+    yLabels,
+    references: refPoints,
+    last: { x: xOf(lastPt.t), y: yOf(lastPt.v) },
+  };
+}
+
+// Where a discharge sits against a Channel capacity, as a fact (never a Status). Null when either
+// figure is missing. The difference is in m3/s, 2 dp, always >= 0.
+function channelCapacityComparison(dischargeM3s, capacityM3s) {
+  const ok = (v) => typeof v === "number" && Number.isFinite(v);
+  if (!ok(dischargeM3s) || !ok(capacityM3s)) return null;
+  const diffM3s = Math.round(Math.abs(dischargeM3s - capacityM3s) * 100) / 100;
+  return { direction: diffM3s === 0 ? "at" : dischargeM3s > capacityM3s ? "above" : "below", diffM3s };
+}
+
+// ThaiWater's per-station `waterlevel_graph` (the feed behind its chart): hourly points for a
+// date range. It carries stations the bulk `waterlevel_load` omits (the Mae Klong Dam's station
+// SND04, K.63). Hours the source has not filled yet come back with a null value: they are dropped,
+// never stored as zero. Anything malformed gives no rows, not an exception.
+function parseWaterLevelGraph(raw) {
+  const data = raw && raw.data;
+  const points = data && Array.isArray(data.graph_data) ? data.graph_data : [];
+  const rows = points
+    .filter((p) => p && strictNumberOrNull(p.value) !== null)
+    .map((p) => ({
+      updatedAt: toIsoBangkok(p.datetime),
+      levelMsl: strictNumberOrNull(p.value),
+      dischargeM3s: strictNumberOrNull(p.discharge),
+    }));
+  return { rows, bankMsl: data ? strictNumberOrNull(data.min_bank) : null };
+}
+
+// Which graph rows are not yet in the History: those strictly newer than the last stored
+// `updatedAt`, oldest first. An empty History takes them all, which is how the first run
+// backfills the days the response covers. History stays append-only and truthful.
+function newGraphRows(history, rows) {
+  const last = history.length ? new Date(history[history.length - 1].updatedAt).getTime() : -Infinity;
+  return rows
+    .filter((r) => new Date(r.updatedAt).getTime() > last)
+    .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+}
+
+// EGAT's telemetry page (water.egat.co.th/telemeter/schematic): server-rendered HTML tables.
+// Read ONLY for Channel capacity (ความจุลำน้ำ) of EGAT's own stations (VKD/SND codes; the RID
+// K-station table below them is not read, we get those from ThaiWater). Columns are read by
+// position, so the header is checked first: an unrecognised layout gives [], never shifted numbers.
+// Dates are Buddhist-era dd-mm-yyyy hh:mm:ss in Bangkok time.
+const EGAT_TELEMETRY_COLS = { code: 1, name: 2, time: 6, capacity: 7 };
+
+function parseEgatChannelCapacity(html) {
+  if (typeof html !== "string") return [];
+  const text = (cell) => cell.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  const out = [];
+  for (const table of html.match(/<table[\s\S]*?<\/table>/g) || []) {
+    const rows = (table.match(/<tr[\s\S]*?<\/tr>/g) || []).map((r) => (r.match(/<t[dh][\s\S]*?<\/t[dh]>/g) || []).map(text));
+    const header = rows.find((cells) => cells.length === 8 && cells[EGAT_TELEMETRY_COLS.code] === "รหัสสถานี");
+    if (!header) continue;
+    if (!header[EGAT_TELEMETRY_COLS.capacity].startsWith("ความจุลำน้ำ") || !header[EGAT_TELEMETRY_COLS.time].startsWith("ณ วัน")) return [];
+    for (const cells of rows) {
+      if (cells.length !== 8 || !/^(VKD|SND)\d+$/.test(cells[EGAT_TELEMETRY_COLS.code])) continue;
+      const stamp = cells[EGAT_TELEMETRY_COLS.time].match(/^(\d\d)-(\d\d)-(\d{4}) (\d\d:\d\d:\d\d)$/);
+      out.push({
+        stationCode: cells[EGAT_TELEMETRY_COLS.code],
+        name: cells[EGAT_TELEMETRY_COLS.name],
+        capacityM3s: strictNumberOrNull(cells[EGAT_TELEMETRY_COLS.capacity].replace(/,/g, "")),
+        asOf: stamp ? `${Number(stamp[3]) - 543}-${stamp[2]}-${stamp[1]}T${stamp[4]}+07:00` : null,
+      });
+    }
+    break; // the first table with this header is EGAT's own
+  }
+  return out;
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+}
+
+</script>
+<script>
+// The one small time-series chart both pages draw. The numbers come from chartModel (parse.js,
+// tested); this only turns them into markup. Needs parse.js first.
+//
+// What it shows, so nothing has to be guessed:
+//   - the vertical scale: the highest and lowest value of the scale in the left margin (and the
+//     unit under them), plus a dashed line and its own label for a reference level, if there is one;
+//   - the time scale: hour ticks shared by every box, a date label where the day changes;
+//   - gaps: hours with no reading are shaded and named, and the line breaks there.
+(function () {
+  const W = 300;
+  const H = 56;
+  const PAD_X = 6; // horizontal padding inside the svg, in viewBox units
+  const MIN_GAP_LABEL = 0.3; // a gap this wide (fraction of the axis) is big enough to carry its own label
+
+  // A tick on the left edge keeps its gridline but not its label: the label would sit on the unit in the margin.
+  const EDGE_FRAC = 0.04;
+  const MIN_LABEL_GAP_Y = 0.2; // labels closer than this (of the plot height, about 11 px) would overlap
+
+  // Moves labels apart so their text does not overlap (display only; the value stays true and the
+  // gridline stays where the value is). Top to bottom, keeping inside the plot.
+  function spaceLabels(labels) {
+    const ys = labels.map((l) => l.y);
+    for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] + MIN_LABEL_GAP_Y);
+    for (let i = ys.length - 1; i >= 0; i--) {
+      ys[i] = Math.min(ys[i], 1 - 0.05 - (ys.length - 1 - i) * MIN_LABEL_GAP_Y);
+      if (i < ys.length - 1) ys[i] = Math.min(ys[i], ys[i + 1] - MIN_LABEL_GAP_Y);
+    }
+    return labels.map((l, i) => ({ ...l, shownY: ys[i] }));
+  }
+
+  const px = (frac) => PAD_X + frac * (W - PAD_X * 2); // viewBox x
+  const pct = (frac) => ((px(frac) / W) * 100).toFixed(2); // the same position as a CSS percentage
+  const dayLabel = (ms) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short" }).format(ms);
+
+  // opts: { points: [{t, v}], startT, endT, windowH, minRange, digits, unit, ariaLabel,
+  //         references: [{ v, level, name }], referenceProximity, referenceNote, maxStepMs }
+  // `referenceProximity`: draw a reference only while the readings are within that distance of it.
+  // `level` picks the line's colour (CSS: data-level); `name` is its colour in words, so the meaning
+  // never rests on colour alone.
+  // Returns "" when nothing falls inside the Window, so the caller can show its own empty message.
+  function renderChart(opts) {
+    const m = chartModel(opts.points, {
+      startT: opts.startT,
+      endT: opts.endT,
+      minRange: opts.minRange,
+      references: opts.references || [],
+      referenceProximity: opts.referenceProximity ?? null,
+      maxStepMs: opts.maxStepMs,
+    });
+    if (!m) return "";
+    const digits = opts.digits ?? 2;
+    const num = (v) => v.toFixed(digits);
+
+    const ticks = axisTicks(opts.startT, opts.endT, opts.windowH).map((k) => ({ ...k, frac: (k.t - opts.startT) / (opts.endT - opts.startT) }));
+    const vGrid = ticks
+      .map((k) => `<line class="spark-grid"${k.midnight ? " data-midnight" : ""} x1="${px(k.frac).toFixed(1)}" y1="0" x2="${px(k.frac).toFixed(1)}" y2="${H}" />`)
+      .join("");
+    // the reference has its own dashed line, so it gets no plain gridline underneath
+    const hGrid = m.yLabels.filter((l) => !m.references.includes(l)).map((l) => `<line class="spark-hgrid" x1="0" y1="${(l.y * H).toFixed(1)}" x2="${W}" y2="${(l.y * H).toFixed(1)}" />`).join("");
+    const refLines = m.references.map((r) => `<line class="spark-ref" data-level="${r.level || ""}" x1="0" y1="${(r.y * H).toFixed(1)}" x2="${W}" y2="${(r.y * H).toFixed(1)}" />`).join("");
+    const gapRects = m.gaps.map((g) => `<rect class="spark-gap" x="${px(g.x0).toFixed(1)}" y="0" width="${(px(g.x1) - px(g.x0)).toFixed(1)}" height="${H}" />`).join("");
+    const lines = m.segments
+      .map((seg) =>
+        seg.length > 1
+          ? `<polyline class="spark-line" points="${seg.map((p) => `${px(p.x).toFixed(1)},${(p.y * H).toFixed(1)}`).join(" ")}" />`
+          : seg[0].x === m.last.x && seg[0].y === m.last.y
+            ? "" // the newest reading is drawn as the end dot below
+            : `<path class="spark-dot spark-dot-small" d="M${px(seg[0].x).toFixed(1)} ${(seg[0].y * H).toFixed(1)}h0" />`,
+      )
+      .join("");
+    const lastDot = `<path class="spark-dot" d="M${px(m.last.x).toFixed(1)} ${(m.last.y * H).toFixed(1)}h0" />`;
+
+    const yLabels = spaceLabels(m.yLabels)
+      .map((l) => `<span class="spark-ylab${m.references.some((r) => r.v === l.v) ? " ref" : ""}" data-level="${(m.references.find((r) => r.v === l.v) || {}).level || ""}" style="top:${(l.shownY * 100).toFixed(1)}%">${num(l.v)}</span>`)
+      .join("");
+    const gapLabels = m.gaps
+      .filter((g) => g.x1 - g.x0 >= MIN_GAP_LABEL)
+      .map((g) => `<span class="spark-gaplab" style="left:${pct(g.x0)}%;width:${(pct(g.x1) - pct(g.x0)).toFixed(2)}%">ไม่มีข้อมูล ${Math.round(g.hours)} ชม.</span>`)
+      .join("");
+    const tickLabels = ticks
+      .map((k) => `<span class="tick${k.frac < EDGE_FRAC ? " edge" : ""}"${k.midnight ? " data-midnight" : ""} style="left:${pct(k.frac)}%">${k.midnight ? dayLabel(k.t) : `${String(k.hour).padStart(2, "0")}:00`}</span>`)
+      .join("");
+    // A long unit does not fit the margin; those charts carry it in their caption instead.
+    const unitLabel = opts.unit && opts.unit.length <= 7 ? `<div class="spark-yunit">${opts.unit}</div>` : "";
+
+    const cover = m.missingHours >= 1 ? `<div class="spark-cover">ไม่มีข้อมูลในช่วงนี้ ${Math.round(m.missingHours)} ชม.</div>` : "";
+    const legend = m.references.length
+      ? `<div class="spark-legend">${[...m.references].reverse().map((r) => `<span class="spark-legend-item"><span class="spark-legend-line" data-level="${r.level || ""}"></span>${num(r.v)}${r.name ? ` ${r.name}` : ""}</span>`).join(" ")}${opts.unit ? ` ${opts.unit}` : ""}${opts.referenceNote ? ` · ${opts.referenceNote}` : ""}</div>`
+      : "";
+
+    return `<div class="spark-plot"${m.references.length ? " data-tall" : ""}>
+        <div class="spark-canvas">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${opts.ariaLabel || ""}">${gapRects}${hGrid}${vGrid}${refLines}${lines}${lastDot}</svg>
+          ${yLabels}${gapLabels}
+        </div>
+        <div class="spark-axis${ticks.length > 6 ? " dense" : ""}">${unitLabel}${tickLabels}</div>
+      </div>${cover}${legend}`;
+  }
+
+  window.renderChart = renderChart;
+})();
+
+</script>
+<script>
+const DATA = {"K.58 \u0e1a\u0e49\u0e32\u0e19\u0e1b\u0e32\u0e01\u0e41\u0e0b\u0e07": [{"t": "2026-09-29T12:00:00+07:00", "v": 54.55}, {"t": "2026-09-29T12:00:00+07:00", "v": 54.55}, {"t": "2026-09-29T13:00:00+07:00", "v": 54.42}, {"t": "2026-09-29T13:00:00+07:00", "v": 54.42}, {"t": "2026-09-29T13:00:00+07:00", "v": 54.42}, {"t": "2026-09-29T13:00:00+07:00", "v": 54.42}, {"t": "2026-09-29T13:00:00+07:00", "v": 54.42}, {"t": "2026-09-29T14:00:00+07:00", "v": 54.29}, {"t": "2026-09-29T15:00:00+07:00", "v": 54.18}, {"t": "2026-09-29T16:00:00+07:00", "v": 54.06}, {"t": "2026-09-29T17:00:00+07:00", "v": 53.96}, {"t": "2026-09-29T18:00:00+07:00", "v": 53.79}, {"t": "2026-09-29T19:00:00+07:00", "v": 53.66}, {"t": "2026-09-29T20:00:00+07:00", "v": 53.54}, {"t": "2026-09-29T21:00:00+07:00", "v": 53.41}, {"t": "2026-09-29T22:00:00+07:00", "v": 53.29}, {"t": "2026-09-29T23:00:00+07:00", "v": 53.16}, {"t": "2026-09-30T01:00:00+07:00", "v": 52.9}, {"t": "2026-09-30T02:00:00+07:00", "v": 52.78}, {"t": "2026-09-30T03:00:00+07:00", "v": 52.66}, {"t": "2026-09-30T04:00:00+07:00", "v": 52.53}, {"t": "2026-09-30T05:00:00+07:00", "v": 52.41}, {"t": "2026-09-30T06:00:00+07:00", "v": 52.27}, {"t": "2026-09-30T07:00:00+07:00", "v": 52.15}, {"t": "2026-09-30T08:00:00+07:00", "v": 52.01}, {"t": "2026-09-30T09:00:00+07:00", "v": 51.87}, {"t": "2026-09-30T10:00:00+07:00", "v": 51.75}, {"t": "2026-09-30T11:00:00+07:00", "v": 51.62}, {"t": "2026-09-30T12:00:00+07:00", "v": 51.5}, {"t": "2026-09-30T13:00:00+07:00", "v": 51.37}, {"t": "2026-09-30T14:00:00+07:00", "v": 51.24}, {"t": "2026-09-30T15:00:00+07:00", "v": 51.15}, {"t": "2026-09-30T16:00:00+07:00", "v": 51.04}, {"t": "2026-09-30T17:00:00+07:00", "v": 50.92}, {"t": "2026-09-30T18:00:00+07:00", "v": 50.82}, {"t": "2026-09-30T19:00:00+07:00", "v": 50.72}, {"t": "2026-09-30T20:00:00+07:00", "v": 50.63}], "K.37 \u0e1a\u0e49\u0e32\u0e19\u0e27\u0e31\u0e07\u0e40\u0e22\u0e47\u0e19": [{"t": "2026-09-30T13:00:00+07:00", "v": 31.7}, {"t": "2026-09-30T14:00:00+07:00", "v": 31.67}, {"t": "2026-09-30T15:00:00+07:00", "v": 31.64}, {"t": "2026-09-30T16:00:00+07:00", "v": 31.61}, {"t": "2026-09-30T17:00:00+07:00", "v": 31.59}, {"t": "2026-09-30T18:00:00+07:00", "v": 31.54}, {"t": "2026-09-30T19:00:00+07:00", "v": 31.51}, {"t": "2026-09-30T20:00:00+07:00", "v": 31.47}], "\u0e40\u0e02\u0e37\u0e48\u0e2d\u0e19\u0e41\u0e21\u0e48\u0e01\u0e25\u0e2d\u0e07 (SND04)": [{"t": "2026-09-29T00:00:00+07:00", "v": 22.413}, {"t": "2026-09-29T01:00:00+07:00", "v": 22.448}, {"t": "2026-09-29T02:00:00+07:00", "v": 22.484}, {"t": "2026-09-29T03:00:00+07:00", "v": 22.54}, {"t": "2026-09-29T04:00:00+07:00", "v": 22.599}, {"t": "2026-09-29T05:00:00+07:00", "v": 22.647}, {"t": "2026-09-29T06:00:00+07:00", "v": 22.697}, {"t": "2026-09-29T07:00:00+07:00", "v": 22.751}, {"t": "2026-09-29T08:00:00+07:00", "v": 22.79}, {"t": "2026-09-29T09:00:00+07:00", "v": 22.829}, {"t": "2026-09-29T10:00:00+07:00", "v": 22.841}, {"t": "2026-09-29T11:00:00+07:00", "v": 22.854}, {"t": "2026-09-29T12:00:00+07:00", "v": 22.834}, {"t": "2026-09-29T13:00:00+07:00", "v": 22.814}, {"t": "2026-09-29T14:00:00+07:00", "v": 22.768}, {"t": "2026-09-29T15:00:00+07:00", "v": 22.758}, {"t": "2026-09-29T16:00:00+07:00", "v": 22.742}, {"t": "2026-09-29T17:00:00+07:00", "v": 22.722}, {"t": "2026-09-29T18:00:00+07:00", "v": 22.726}, {"t": "2026-09-29T19:00:00+07:00", "v": 22.716}, {"t": "2026-09-29T20:00:00+07:00", "v": 22.705}, {"t": "2026-09-29T21:00:00+07:00", "v": 22.713}, {"t": "2026-09-29T22:00:00+07:00", "v": 22.697}, {"t": "2026-09-29T23:00:00+07:00", "v": 22.693}, {"t": "2026-09-30T00:00:00+07:00", "v": 22.772}, {"t": "2026-09-30T01:00:00+07:00", "v": 22.893}, {"t": "2026-09-30T02:00:00+07:00", "v": 22.837}, {"t": "2026-09-30T03:00:00+07:00", "v": 22.812}, {"t": "2026-09-30T04:00:00+07:00", "v": 22.8}, {"t": "2026-09-30T05:00:00+07:00", "v": 22.793}, {"t": "2026-09-30T06:00:00+07:00", "v": 22.799}, {"t": "2026-09-30T07:00:00+07:00", "v": 22.786}, {"t": "2026-09-30T08:00:00+07:00", "v": 22.777}, {"t": "2026-09-30T09:00:00+07:00", "v": 22.759}, {"t": "2026-09-30T10:00:00+07:00", "v": 22.76}, {"t": "2026-09-30T11:00:00+07:00", "v": 22.757}, {"t": "2026-09-30T12:00:00+07:00", "v": 22.756}, {"t": "2026-09-30T13:00:00+07:00", "v": 22.735}, {"t": "2026-09-30T14:00:00+07:00", "v": 22.746}, {"t": "2026-09-30T15:00:00+07:00", "v": 22.976}, {"t": "2026-09-30T16:00:00+07:00", "v": 22.961}, {"t": "2026-09-30T17:00:00+07:00", "v": 22.952}, {"t": "2026-09-30T18:00:00+07:00", "v": 22.928}, {"t": "2026-09-30T19:00:00+07:00", "v": 22.893}, {"t": "2026-09-30T20:00:00+07:00", "v": 22.863}, {"t": "2026-09-30T21:00:00+07:00", "v": 22.854}], "K.11A \u0e1a\u0e49\u0e32\u0e19\u0e27\u0e31\u0e07\u0e02\u0e19\u0e32\u0e22": [{"t": "2026-09-29T12:00:00+07:00", "v": 17.73}, {"t": "2026-09-29T12:00:00+07:00", "v": 17.73}, {"t": "2026-09-29T13:00:00+07:00", "v": 17.79}, {"t": "2026-09-29T13:00:00+07:00", "v": 17.79}, {"t": "2026-09-29T13:00:00+07:00", "v": 17.79}, {"t": "2026-09-29T13:00:00+07:00", "v": 17.79}, {"t": "2026-09-29T13:00:00+07:00", "v": 17.79}, {"t": "2026-09-29T14:00:00+07:00", "v": 17.92}, {"t": "2026-09-29T15:00:00+07:00", "v": 17.94}, {"t": "2026-09-29T16:00:00+07:00", "v": 17.97}, {"t": "2026-09-29T17:00:00+07:00", "v": 18.08}, {"t": "2026-09-29T18:00:00+07:00", "v": 18.08}, {"t": "2026-09-29T19:00:00+07:00", "v": 18.2}, {"t": "2026-09-29T20:00:00+07:00", "v": 18.2}, {"t": "2026-09-29T21:00:00+07:00", "v": 18.25}, {"t": "2026-09-29T22:00:00+07:00", "v": 18.32}, {"t": "2026-09-29T23:00:00+07:00", "v": 18.34}, {"t": "2026-09-30T01:00:00+07:00", "v": 18.16}, {"t": "2026-09-30T02:00:00+07:00", "v": 18.35}, {"t": "2026-09-30T03:00:00+07:00", "v": 18.36}, {"t": "2026-09-30T04:00:00+07:00", "v": 18.44}, {"t": "2026-09-30T05:00:00+07:00", "v": 18.47}, {"t": "2026-09-30T06:00:00+07:00", "v": 18.48}, {"t": "2026-09-30T07:00:00+07:00", "v": 18.47}, {"t": "2026-09-30T08:00:00+07:00", "v": 18.52}, {"t": "2026-09-30T09:00:00+07:00", "v": 18.55}, {"t": "2026-09-30T10:00:00+07:00", "v": 18.55}, {"t": "2026-09-30T11:00:00+07:00", "v": 18.55}, {"t": "2026-09-30T12:00:00+07:00", "v": 18.58}, {"t": "2026-09-30T13:00:00+07:00", "v": 18.57}, {"t": "2026-09-30T14:00:00+07:00", "v": 18.59}, {"t": "2026-09-30T15:00:00+07:00", "v": 18.07}, {"t": "2026-09-30T16:00:00+07:00", "v": 18.33}, {"t": "2026-09-30T17:00:00+07:00", "v": 18.47}, {"t": "2026-09-30T18:00:00+07:00", "v": 18.61}, {"t": "2026-09-30T19:00:00+07:00", "v": 18.69}, {"t": "2026-09-30T20:00:00+07:00", "v": 18.64}], "K.63 \u0e1a\u0e49\u0e32\u0e19\u0e43\u0e2b\u0e21\u0e48": [{"t": "2026-09-29T01:00:00+07:00", "v": 16.15}, {"t": "2026-09-29T02:00:00+07:00", "v": 16.18}, {"t": "2026-09-29T03:00:00+07:00", "v": 16.200000000000003}, {"t": "2026-09-29T04:00:00+07:00", "v": 16.23}, {"t": "2026-09-29T05:00:00+07:00", "v": 16.259999999999998}, {"t": "2026-09-29T06:00:00+07:00", "v": 16.29}, {"t": "2026-09-29T07:00:00+07:00", "v": 16.310000000000002}, {"t": "2026-09-29T08:00:00+07:00", "v": 16.34}, {"t": "2026-09-29T09:00:00+07:00", "v": 16.39}, {"t": "2026-09-29T10:00:00+07:00", "v": 16.450000000000003}, {"t": "2026-09-29T11:00:00+07:00", "v": 16.509999999999998}, {"t": "2026-09-29T12:00:00+07:00", "v": 16.58}, {"t": "2026-09-29T13:00:00+07:00", "v": 16.66}, {"t": "2026-09-29T14:00:00+07:00", "v": 16.75}, {"t": "2026-09-29T15:00:00+07:00", "v": 16.82}, {"t": "2026-09-29T16:00:00+07:00", "v": 16.86}, {"t": "2026-09-29T17:00:00+07:00", "v": 16.93}, {"t": "2026-09-29T18:00:00+07:00", "v": 16.97}, {"t": "2026-09-29T19:00:00+07:00", "v": 17.04}, {"t": "2026-09-29T20:00:00+07:00", "v": 17.07}, {"t": "2026-09-29T21:00:00+07:00", "v": 17.11}, {"t": "2026-09-29T22:00:00+07:00", "v": 17.15}, {"t": "2026-09-29T23:00:00+07:00", "v": 17.18}, {"t": "2026-09-30T01:00:00+07:00", "v": 17.05}, {"t": "2026-09-30T02:00:00+07:00", "v": 17.14}, {"t": "2026-09-30T03:00:00+07:00", "v": 17.200000000000003}, {"t": "2026-09-30T04:00:00+07:00", "v": 17.25}, {"t": "2026-09-30T05:00:00+07:00", "v": 17.29}, {"t": "2026-09-30T06:00:00+07:00", "v": 17.34}, {"t": "2026-09-30T07:00:00+07:00", "v": 17.37}, {"t": "2026-09-30T08:00:00+07:00", "v": 17.41}, {"t": "2026-09-30T09:00:00+07:00", "v": 17.439999999999998}, {"t": "2026-09-30T10:00:00+07:00", "v": 17.47}, {"t": "2026-09-30T11:00:00+07:00", "v": 17.47}, {"t": "2026-09-30T12:00:00+07:00", "v": 17.48}, {"t": "2026-09-30T13:00:00+07:00", "v": 17.490000000000002}, {"t": "2026-09-30T14:00:00+07:00", "v": 17.54}, {"t": "2026-09-30T15:00:00+07:00", "v": 17.43}, {"t": "2026-09-30T16:00:00+07:00", "v": 17.22}, {"t": "2026-09-30T17:00:00+07:00", "v": 17.39}, {"t": "2026-09-30T18:00:00+07:00", "v": 17.46}, {"t": "2026-09-30T19:00:00+07:00", "v": 17.52}, {"t": "2026-09-30T20:00:00+07:00", "v": 17.560000000000002}], "K.55A \u0e2a\u0e30\u0e1e\u0e32\u0e19\u0e04\u0e48\u0e32\u0e22\u0e2b\u0e25\u0e27\u0e07": [{"t": "2026-09-29T12:00:00+07:00", "v": 9.29}, {"t": "2026-09-29T12:00:00+07:00", "v": 9.29}, {"t": "2026-09-29T12:00:00+07:00", "v": 9.29}, {"t": "2026-09-29T12:00:00+07:00", "v": 9.29}, {"t": "2026-09-29T13:00:00+07:00", "v": 9.33}, {"t": "2026-09-29T13:00:00+07:00", "v": 9.33}, {"t": "2026-09-29T13:00:00+07:00", "v": 9.33}, {"t": "2026-09-29T13:00:00+07:00", "v": 9.33}, {"t": "2026-09-29T13:00:00+07:00", "v": 9.33}, {"t": "2026-09-29T14:00:00+07:00", "v": 9.38}, {"t": "2026-09-29T15:00:00+07:00", "v": 9.45}, {"t": "2026-09-29T16:00:00+07:00", "v": 9.51}, {"t": "2026-09-29T17:00:00+07:00", "v": 9.58}, {"t": "2026-09-29T18:00:00+07:00", "v": 9.62}, {"t": "2026-09-29T19:00:00+07:00", "v": 9.67}, {"t": "2026-09-29T20:00:00+07:00", "v": 9.71}, {"t": "2026-09-29T20:00:00+07:00", "v": 9.71}, {"t": "2026-09-29T21:00:00+07:00", "v": 9.77}, {"t": "2026-09-29T22:00:00+07:00", "v": 9.8}, {"t": "2026-09-29T23:00:00+07:00", "v": 9.84}, {"t": "2026-09-30T01:00:00+07:00", "v": 9.91}, {"t": "2026-09-30T02:00:00+07:00", "v": 9.94}, {"t": "2026-09-30T03:00:00+07:00", "v": 9.96}, {"t": "2026-09-30T04:00:00+07:00", "v": 10}, {"t": "2026-09-30T05:00:00+07:00", "v": 10.02}, {"t": "2026-09-30T06:00:00+07:00", "v": 10.07}, {"t": "2026-09-30T07:00:00+07:00", "v": 10.11}, {"t": "2026-09-30T08:00:00+07:00", "v": 10.16}, {"t": "2026-09-30T09:00:00+07:00", "v": 10.21}, {"t": "2026-09-30T10:00:00+07:00", "v": 10.27}, {"t": "2026-09-30T11:00:00+07:00", "v": 10.31}, {"t": "2026-09-30T12:00:00+07:00", "v": 10.34}, {"t": "2026-09-30T13:00:00+07:00", "v": 10.41}, {"t": "2026-09-30T14:00:00+07:00", "v": 10.44}, {"t": "2026-09-30T15:00:00+07:00", "v": 10.47}, {"t": "2026-09-30T16:00:00+07:00", "v": 10.52}, {"t": "2026-09-30T17:00:00+07:00", "v": 10.54}, {"t": "2026-09-30T18:00:00+07:00", "v": 10.54}, {"t": "2026-09-30T19:00:00+07:00", "v": 10.52}, {"t": "2026-09-30T20:00:00+07:00", "v": 10.57}], "\u0e42\u0e1e\u0e18\u0e32\u0e23\u0e32\u0e21": [{"t": "2026-09-29T12:40:00+07:00", "v": 4.96}, {"t": "2026-09-29T12:50:00+07:00", "v": 4.98}, {"t": "2026-09-29T13:00:00+07:00", "v": 4.99}, {"t": "2026-09-29T13:30:00+07:00", "v": 5}, {"t": "2026-09-29T13:30:00+07:00", "v": 5}, {"t": "2026-09-29T13:40:00+07:00", "v": 4.99}, {"t": "2026-09-29T13:50:00+07:00", "v": 5.02}, {"t": "2026-09-29T14:10:00+07:00", "v": 5}, {"t": "2026-09-29T14:20:00+07:00", "v": 5.04}, {"t": "2026-09-29T14:30:00+07:00", "v": 5.02}, {"t": "2026-09-29T14:40:00+07:00", "v": 5.04}, {"t": "2026-09-29T15:00:00+07:00", "v": 5.07}, {"t": "2026-09-29T15:20:00+07:00", "v": 5.05}, {"t": "2026-09-29T15:30:00+07:00", "v": 5.08}, {"t": "2026-09-29T15:40:00+07:00", "v": 5.07}, {"t": "2026-09-29T16:00:00+07:00", "v": 5.1}, {"t": "2026-09-29T16:10:00+07:00", "v": 5.12}, {"t": "2026-09-29T16:20:00+07:00", "v": 5.12}, {"t": "2026-09-29T16:40:00+07:00", "v": 5.14}, {"t": "2026-09-29T16:50:00+07:00", "v": 5.11}, {"t": "2026-09-29T17:00:00+07:00", "v": 5.14}, {"t": "2026-09-29T17:20:00+07:00", "v": 5.15}, {"t": "2026-09-29T17:30:00+07:00", "v": 5.14}, {"t": "2026-09-29T17:50:00+07:00", "v": 5.17}, {"t": "2026-09-29T18:00:00+07:00", "v": 5.14}, {"t": "2026-09-29T18:10:00+07:00", "v": 5.17}, {"t": "2026-09-29T18:30:00+07:00", "v": 5.19}, {"t": "2026-09-29T18:40:00+07:00", "v": 5.2}, {"t": "2026-09-29T18:50:00+07:00", "v": 5.19}, {"t": "2026-09-29T19:10:00+07:00", "v": 5.2}, {"t": "2026-09-29T19:20:00+07:00", "v": 5.22}, {"t": "2026-09-29T19:30:00+07:00", "v": 5.21}, {"t": "2026-09-29T19:50:00+07:00", "v": 5.23}, {"t": "2026-09-29T20:00:00+07:00", "v": 5.24}, {"t": "2026-09-29T20:10:00+07:00", "v": 5.26}, {"t": "2026-09-29T20:30:00+07:00", "v": 5.28}, {"t": "2026-09-29T20:40:00+07:00", "v": 5.28}, {"t": "2026-09-29T20:50:00+07:00", "v": 5.29}, {"t": "2026-09-29T21:10:00+07:00", "v": 5.26}, {"t": "2026-09-29T21:20:00+07:00", "v": 5.29}, {"t": "2026-09-29T21:30:00+07:00", "v": 5.31}, {"t": "2026-09-29T21:50:00+07:00", "v": 5.33}, {"t": "2026-09-29T22:00:00+07:00", "v": 5.32}, {"t": "2026-09-29T22:10:00+07:00", "v": 5.33}, {"t": "2026-09-29T22:30:00+07:00", "v": 5.31}, {"t": "2026-09-29T22:40:00+07:00", "v": 5.33}, {"t": "2026-09-29T23:00:00+07:00", "v": 5.37}, {"t": "2026-09-29T23:10:00+07:00", "v": 5.36}, {"t": "2026-09-29T23:20:00+07:00", "v": 5.38}, {"t": "2026-09-29T23:40:00+07:00", "v": 5.36}, {"t": "2026-09-29T23:50:00+07:00", "v": 5.39}, {"t": "2026-09-30T00:00:00+07:00", "v": 5.37}, {"t": "2026-09-30T00:20:00+07:00", "v": 5.41}, {"t": "2026-09-30T00:30:00+07:00", "v": 5.42}, {"t": "2026-09-30T00:40:00+07:00", "v": 5.42}, {"t": "2026-09-30T01:00:00+07:00", "v": 5.41}, {"t": "2026-09-30T01:10:00+07:00", "v": 5.43}, {"t": "2026-09-30T01:20:00+07:00", "v": 5.42}, {"t": "2026-09-30T01:40:00+07:00", "v": 5.4}, {"t": "2026-09-30T01:50:00+07:00", "v": 5.45}, {"t": "2026-09-30T02:00:00+07:00", "v": 5.44}, {"t": "2026-09-30T02:20:00+07:00", "v": 5.47}, {"t": "2026-09-30T02:30:00+07:00", "v": 5.46}, {"t": "2026-09-30T02:50:00+07:00", "v": 5.44}, {"t": "2026-09-30T03:00:00+07:00", "v": 5.45}, {"t": "2026-09-30T03:10:00+07:00", "v": 5.47}, {"t": "2026-09-30T03:30:00+07:00", "v": 5.46}, {"t": "2026-09-30T03:40:00+07:00", "v": 5.48}, {"t": "2026-09-30T03:50:00+07:00", "v": 5.48}, {"t": "2026-09-30T04:10:00+07:00", "v": 5.47}, {"t": "2026-09-30T04:20:00+07:00", "v": 5.47}, {"t": "2026-09-30T04:30:00+07:00", "v": 5.49}, {"t": "2026-09-30T04:50:00+07:00", "v": 5.48}, {"t": "2026-09-30T05:00:00+07:00", "v": 5.49}, {"t": "2026-09-30T05:10:00+07:00", "v": 5.5}, {"t": "2026-09-30T05:30:00+07:00", "v": 5.51}, {"t": "2026-09-30T05:40:00+07:00", "v": 5.49}, {"t": "2026-09-30T05:50:00+07:00", "v": 5.54}, {"t": "2026-09-30T06:10:00+07:00", "v": 5.53}, {"t": "2026-09-30T06:20:00+07:00", "v": 5.54}, {"t": "2026-09-30T06:30:00+07:00", "v": 5.54}, {"t": "2026-09-30T06:50:00+07:00", "v": 5.52}, {"t": "2026-09-30T07:00:00+07:00", "v": 5.53}, {"t": "2026-09-30T07:10:00+07:00", "v": 5.51}, {"t": "2026-09-30T07:30:00+07:00", "v": 5.54}, {"t": "2026-09-30T07:40:00+07:00", "v": 5.52}, {"t": "2026-09-30T07:50:00+07:00", "v": 5.55}, {"t": "2026-09-30T08:10:00+07:00", "v": 5.54}, {"t": "2026-09-30T08:20:00+07:00", "v": 5.57}, {"t": "2026-09-30T08:30:00+07:00", "v": 5.57}, {"t": "2026-09-30T08:50:00+07:00", "v": 5.57}, {"t": "2026-09-30T09:00:00+07:00", "v": 5.55}, {"t": "2026-09-30T09:10:00+07:00", "v": 5.58}, {"t": "2026-09-30T09:30:00+07:00", "v": 5.6}, {"t": "2026-09-30T09:40:00+07:00", "v": 5.58}, {"t": "2026-09-30T09:50:00+07:00", "v": 5.58}, {"t": "2026-09-30T10:10:00+07:00", "v": 5.62}, {"t": "2026-09-30T10:20:00+07:00", "v": 5.61}, {"t": "2026-09-30T10:30:00+07:00", "v": 5.62}, {"t": "2026-09-30T10:50:00+07:00", "v": 5.61}, {"t": "2026-09-30T11:00:00+07:00", "v": 5.61}, {"t": "2026-09-30T11:10:00+07:00", "v": 5.66}, {"t": "2026-09-30T11:30:00+07:00", "v": 5.64}, {"t": "2026-09-30T11:40:00+07:00", "v": 5.66}, {"t": "2026-09-30T11:50:00+07:00", "v": 5.64}, {"t": "2026-09-30T12:10:00+07:00", "v": 5.66}, {"t": "2026-09-30T12:20:00+07:00", "v": 5.64}, {"t": "2026-09-30T12:30:00+07:00", "v": 5.67}, {"t": "2026-09-30T12:50:00+07:00", "v": 5.7}, {"t": "2026-09-30T13:00:00+07:00", "v": 5.67}, {"t": "2026-09-30T13:20:00+07:00", "v": 5.7}, {"t": "2026-09-30T13:30:00+07:00", "v": 5.67}, {"t": "2026-09-30T13:40:00+07:00", "v": 5.7}, {"t": "2026-09-30T14:00:00+07:00", "v": 5.69}, {"t": "2026-09-30T14:10:00+07:00", "v": 5.71}, {"t": "2026-09-30T14:20:00+07:00", "v": 5.72}, {"t": "2026-09-30T14:40:00+07:00", "v": 5.74}, {"t": "2026-09-30T15:40:00+07:00", "v": 5.75}, {"t": "2026-09-30T15:50:00+07:00", "v": 5.73}, {"t": "2026-09-30T16:40:00+07:00", "v": 5.77}, {"t": "2026-09-30T16:50:00+07:00", "v": 5.77}, {"t": "2026-09-30T17:10:00+07:00", "v": 5.78}, {"t": "2026-09-30T17:20:00+07:00", "v": 5.79}, {"t": "2026-09-30T17:30:00+07:00", "v": 5.78}, {"t": "2026-09-30T17:50:00+07:00", "v": 5.77}, {"t": "2026-09-30T18:00:00+07:00", "v": 5.8}, {"t": "2026-09-30T18:10:00+07:00", "v": 5.79}, {"t": "2026-09-30T18:30:00+07:00", "v": 5.79}, {"t": "2026-09-30T18:40:00+07:00", "v": 5.82}, {"t": "2026-09-30T18:50:00+07:00", "v": 5.81}, {"t": "2026-09-30T19:10:00+07:00", "v": 5.8}, {"t": "2026-09-30T19:20:00+07:00", "v": 5.79}, {"t": "2026-09-30T19:30:00+07:00", "v": 5.84}, {"t": "2026-09-30T19:50:00+07:00", "v": 5.8}, {"t": "2026-09-30T20:00:00+07:00", "v": 5.82}, {"t": "2026-09-30T20:10:00+07:00", "v": 5.81}, {"t": "2026-09-30T20:30:00+07:00", "v": 5.82}, {"t": "2026-09-30T20:40:00+07:00", "v": 5.82}, {"t": "2026-09-30T20:50:00+07:00", "v": 5.83}, {"t": "2026-09-30T21:10:00+07:00", "v": 5.82}]};
+const Q = new URLSearchParams(location.search);
+let winH = Number(Q.get("h")) || 12;
+document.querySelectorAll("#wins .wt-btn").forEach((x) => x.setAttribute("aria-pressed", String(Number(x.dataset.h) === winH)));
+const TIERS = [0.25, 0.5, 1, 2, 3, 5];
+const HOUR = 3600000;
+
+function render() {
+  const names = Object.keys(DATA);
+  const series = names.map((n) => DATA[n].map((r) => ({ t: Date.parse(r.t), v: r.v })));
+  const endT = Math.ceil(Math.max(...series.map((p) => p[p.length - 1].t)) / HOUR) * HOUR;
+  const startT = endT - winH * HOUR;
+  const inWin = series.map((pts) => pts.filter((p) => p.t >= startT && p.t <= endT));
+  const range = (pts) => (pts.length ? Math.max(...pts.map((p) => p.v)) - Math.min(...pts.map((p) => p.v)) : 0);
+  const ranges = inWin.map(range);
+  const shared = Math.ceil(Math.max(...ranges) / 0.05) * 0.05; // B: one span for everything
+  const tierOf = (r) => TIERS.find((t) => t >= r) || Math.ceil(r); // C: smallest step that fits
+
+  const chart = (pts, minRange) => renderChart({ points: pts, startT, endT, windowH: winH, minRange, digits: 2, unit: "ม.รทก.", ariaLabel: "ระดับ" });
+  const cell = (pts, minRange, label) => {
+    const m = chartModel(pts, { startT, endT, minRange });
+    if (!m) return `<div class="cell"><div class="spark-empty">ไม่มีข้อมูลในช่วงนี้</div></div>`;
+    const h = m.max - m.min;
+    return `<div class="cell"><div class="spark">${chart(pts, minRange)}</div><div class="h">${label(h)}</div></div>`;
+  };
+
+  let rows = "";
+  names.forEach((n, i) => {
+    const r = ranges[i];
+    rows += `<tr><td class="gname">${n}<small>ช่วงระดับจริง ${(r * 100).toFixed(0)} ซม.</small></td>
+      <td>${cell(series[i], 0.1, (h) => `กราฟสูง <b>${h.toFixed(2)} ม.</b> (ตามข้อมูล)`)}</td>
+      <td>${cell(series[i], shared, (h) => `กราฟสูง <b>${h.toFixed(2)} ม.</b> (เท่ากันทุกกล่อง)`)}</td>
+      <td>${cell(series[i], tierOf(r), (h) => `กราฟสูง <b>${h.toFixed(2)} ม.</b> (ขั้น ${tierOf(r)} ม.)`)}</td></tr>`;
+  });
+  document.getElementById("out").innerHTML = `<table class="cmp"><thead><tr><th></th>
+    <th>A · ซูมตามข้อมูล<small>เหมือนตอนนี้ + บอกความสูงของกราฟ ทุกกล่องสเกลไม่เท่ากัน</small></th>
+    <th>B · สเกลเดียวกันทุกกล่อง (${shared.toFixed(2)} ม.)<small>เทียบความชันได้ตรง ๆ แต่กล่องที่ขยับน้อยจะแบน</small></th>
+    <th>C · สเกลเป็นขั้น (0.25 / 0.5 / 1 / 2 / 3 ม.)<small>ใช้ขั้นที่เล็กที่สุดที่ใส่ข้อมูลได้ ข้อมูลเต็มกล่องเกินครึ่งเสมอ กล่องขั้นเดียวกันเทียบกันได้</small></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+document.getElementById("wins").addEventListener("click", (e) => {
+  const b = e.target.closest(".wt-btn"); if (!b) return;
+  winH = Number(b.dataset.h);
+  document.querySelectorAll("#wins .wt-btn").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  render();
+});
+render();
+</script></body></html>
