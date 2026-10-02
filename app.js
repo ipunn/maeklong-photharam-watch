@@ -773,31 +773,37 @@
     setInterval(renderHealth, 60000); // keep the age current if the page stays open
   }
 
+  // Fills a container with one card per item. On a redraw (a Window change) the old cards stay until the
+  // new ones are all ready and are then swapped in at once: emptying the container first shrinks the page
+  // while the new content loads, and the browser moves the reader up the page to fit (worst on a phone,
+  // where loading takes a moment). The very first draw has nothing to keep, so cards appear one by one.
   async function renderInto(rootId, items, load, nameHtml) {
     const myRender = renderId;
     const root = document.getElementById(rootId);
+    const progressive = !root.firstChild;
+    const cards = [];
     for (const item of items) {
       if (myRender !== renderId) return;
+      let card;
       try {
-        const card = await load(item);
-        if (myRender !== renderId) return;
-        root.appendChild(card);
+        card = await load(item);
       } catch (err) {
         console.error(err);
-        if (myRender !== renderId) return;
-        const card = document.createElement("div");
+        card = document.createElement("div");
         card.className = "station-card";
         card.innerHTML = `<div class="station-header">${nameHtml(item)}</div>
           <div class="chart-empty">โหลดข้อมูลไม่สำเร็จ</div>`;
-        root.appendChild(card);
       }
+      if (myRender !== renderId) return;
+      if (progressive) root.appendChild(card);
+      else cards.push(card);
     }
+    if (!progressive) root.replaceChildren(...cards);
   }
 
   // Draws everything that follows the Window. Cheap to repeat: history files are cached.
   function renderAll() {
-    renderId++;
-    for (const id of ["flow", "stations", "reservoirs"]) document.getElementById(id).innerHTML = "";
+    renderId++; // the old content stays on screen until each part has its replacement
     renderFlow().catch((err) => {
       console.error(err);
       document.getElementById("flow").innerHTML = `<div class="chart-empty">โหลดแผนภาพลำน้ำไม่สำเร็จ</div>`;
