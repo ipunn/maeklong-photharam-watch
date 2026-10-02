@@ -566,9 +566,50 @@ function parseWaterLevelGraph(raw) {
 // `updatedAt`, oldest first. An empty History takes them all, which is how the first run
 // backfills the days the response covers. History stays append-only and truthful.
 function newGraphRows(history, rows) {
-  const last = history.length ? new Date(history[history.length - 1].updatedAt).getTime() : -Infinity;
+  // The newest source time held, wherever it sits in the file: a correction row for an older hour can be last.
+  const last = history.reduce((m, r) => Math.max(m, new Date(r.updatedAt).getTime() || -Infinity), -Infinity);
   return rows
     .filter((r) => new Date(r.updatedAt).getTime() > last)
+    .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+}
+
+// What a reader of a History file should see: one row per source time, oldest first, the LATER row
+// winning where an hour was revised (see correctedGraphRows). History itself keeps both. This also
+// puts a correction row for an older hour back in its place, and stops a provisional discharge
+// surviving its revision. The input is not changed; rows with no readable source time are dropped.
+function currentReadings(rows) {
+  const byTime = new Map();
+  for (const r of rows) {
+    const t = new Date(r.updatedAt).getTime();
+    if (!Number.isNaN(t)) byTime.set(t, r);
+  }
+  return [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(([, r]) => r);
+}
+
+// The source revises an hour it already published: the newest hour comes first as a provisional
+// value (K.11A 23:00 was 12.03 with a discharge of 238, later 17.57; K.63 08:00 was 14.81, later 17.51).
+// newGraphRows only adds hours newer than the last stored one, so a revision would never be read.
+// This returns the rows for hours we ALREADY hold whose level or discharge the source now states
+// differently, oldest first. The Collector appends them as new rows with the same `updatedAt`
+// (History stays append-only; the provisional row stays in the log, and the later row wins per source
+// time everywhere the page reads it). Hours we do not hold are not touched: gaps stay gaps.
+// What counts as a revision: the level differs by more than the source's own 0.01 m resolution, or both
+// hold a discharge and they differ by over 1 m3/s. A discharge that only appears (or disappears) with the
+// same level is not a revision: the source added a field, and an old gauge's rows do not change shape.
+const LEVEL_REVISION_M = 0.005;
+const DISCHARGE_REVISION_M3S = 1;
+
+function correctedGraphRows(history, rows) {
+  const held = new Map(); // source time -> the row we hold for it (the latest appended)
+  for (const r of history) held.set(new Date(r.updatedAt).getTime(), r);
+  const revised = (h, r) =>
+    Math.abs(h.levelMsl - r.levelMsl) > LEVEL_REVISION_M ||
+    (h.dischargeM3s != null && r.dischargeM3s != null && Math.abs(h.dischargeM3s - r.dischargeM3s) > DISCHARGE_REVISION_M3S);
+  return rows
+    .filter((r) => {
+      const h = held.get(new Date(r.updatedAt).getTime());
+      return h && revised(h, r);
+    })
     .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
 }
 
@@ -614,7 +655,13 @@ function parseEgatChannelCapacity(html) {
 const MAX_STEP_M_PER_H = 2;
 
 function suspectLatest(rows, limitMPerH = MAX_STEP_M_PER_H) {
-  const pts = rows.filter((r) => typeof r.levelMsl === "number" && Number.isFinite(r.levelMsl) && !Number.isNaN(new Date(r.updatedAt).getTime()));
+  // One reading per source time, the later row winning: a revised hour (see correctedGraphRows) replaces the provisional one.
+  const byTime = new Map();
+  for (const r of rows) {
+    const t = new Date(r.updatedAt).getTime();
+    if (typeof r.levelMsl === "number" && Number.isFinite(r.levelMsl) && !Number.isNaN(t)) byTime.set(t, r);
+  }
+  const pts = [...byTime.entries()].sort((x, y) => x[0] - y[0]).map(([, r]) => r);
   const tooBig = (a, b) => {
     const hours = (new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) / 3600000;
     return hours > 0 && hours <= 3 && Math.abs(b.levelMsl - a.levelMsl) / hours > limitMPerH;
@@ -670,5 +717,5 @@ function riverlineLink(code, stops = RIVERLINE.stops) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { suspectLatest, MAX_STEP_M_PER_H, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineLink, isStaleReading, LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
+  module.exports = { currentReadings, correctedGraphRows, suspectLatest, MAX_STEP_M_PER_H, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineLink, isStaleReading, LEVEL_SCALE_STEPS_M, chartModel, bangkokDate, GRAPH_STATIONS, channelCapacityComparison, parseEgatChannelCapacity, newGraphRows, parseWaterLevelGraph, axisTicks, steadyTolerance, WINDOWS_H, DEFAULT_WINDOW_H, resolveWindow, aboveBankAlert, dailyValues, tideTrend, bankComparison, dailyHighLow, SITES, TRACKED_STATIONS, stationsForSite, isSameReading, collectorHealth, reservoirBand, seriesOf, isFutureReading, damCapacity, trendOf, parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly };
 }

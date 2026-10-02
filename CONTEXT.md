@@ -36,6 +36,6 @@
 
 **Site alert** — the Bang Kruai page's own red signal: BKK003 (the one Gauge near the area) at least 1 m above its bank height (`aboveBankAlert`; margin is a placeholder set by the maintainer). It is display-only: never written to History, never a Status (no source publishes a threshold), and always labelled on the page as this site's own rule, not an official threshold.
 
-**History** — the append-only per-series log under `data/`. A reading identical to the last stored one is not appended again; a series fed hour by hour from a per-station graph appends only hours newer than the last stored one.
+**History** — the append-only per-series log under `data/`. A reading identical to the last stored one is not appended again; a series fed hour by hour from a per-station graph appends only hours newer than the last stored one. The source sometimes revises an hour it already published (a provisional newest hour, later corrected), so each run also compares the hours it already holds with the response and, where the level moved over 0.01 m (or both discharges differ by over 1 m3/s), **appends a corrected row with the same source time**; the provisional row stays in the log and the later row wins for any reader (`currentReadings`). Hours we do not hold are never back-filled.
 
 **Collector** — the GitHub Actions workflow that scrapes the sources. Each run starts the next one itself (GitHub's `schedule` proved unreliable). It is judged from `data/status.json`, per source, not from the data itself.

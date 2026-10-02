@@ -39,7 +39,7 @@
         fetch(file, { cache: "no-store" }).then((res) => {
           if (!res.ok) throw new Error(`${file} -> HTTP ${res.status}`);
           return res.json();
-        }),
+        }).then((rows) => (Array.isArray(rows) && rows.length && rows[0].updatedAt !== undefined ? currentReadings(rows) : rows)), // one row per source time: a revised hour replaces the provisional one
       );
     }
     return historyCache.get(file);

@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineLink, isStaleReading, suspectLatest, MAX_STEP_M_PER_H } = require("./parse.js");
+const { parseWaterLevelRecord, deriveStatus, toIsoBangkok, parseReservoirRecord, parseReservoirReportDate, parseDamHourlyRecord, pickLatestDamHourly, trendOf, damCapacity, reservoirBand, seriesOf, collectorHealth, isSameReading, SITES, TRACKED_STATIONS, stationsForSite, bankComparison, dailyHighLow, tideTrend, dailyValues, aboveBankAlert, resolveWindow, steadyTolerance, axisTicks, parseWaterLevelGraph, newGraphRows, parseEgatChannelCapacity, channelCapacityComparison, GRAPH_STATIONS, bangkokDate, chartModel, LEVEL_SCALE_STEPS_M, isFutureReading, gaugesForSite, graphStationsForSource, RIVERLINE, riverlineLink, isStaleReading, suspectLatest, MAX_STEP_M_PER_H, correctedGraphRows, currentReadings } = require("./parse.js");
 
 // A real record captured from api-v3.thaiwater.net's waterlevel_load feed
 // for station id 710 ("โพธาราม") on 2026-09-29, trimmed to the fields
@@ -1101,4 +1101,88 @@ test("suspectLatest: the limit is per hour, so a fast 10-minute gauge is judged 
   assert.equal(suspectLatest(fast), null); // 1.2 m/h
   assert.ok(suspectLatest([fast[0], { updatedAt: "2026-10-01T22:10:00+07:00", levelMsl: 5.5 }])); // 3 m/h
   assert.equal(MAX_STEP_M_PER_H, 2);
+});
+
+// ---- correctedGraphRows: the source revises an hour it already published (K.11A 23:00 12.03 -> 17.57, K.63 08:00 14.81 -> 17.51) ----
+const gr = (hhmm, levelMsl, dischargeM3s = null, day = "2026-10-01") => ({ updatedAt: `${day}T${hhmm}:00+07:00`, levelMsl, dischargeM3s });
+const stored = (hhmm, levelMsl, dischargeM3s, scrapedAt = "2026-10-01T16:11:00Z") => {
+  const r = { scrapedAt, updatedAt: `2026-10-01T${hhmm}:00+07:00`, levelMsl, bankMsl: 15.9 };
+  if (dischargeM3s != null) r.dischargeM3s = dischargeM3s;
+  return r;
+};
+
+test("correctedGraphRows: an hour we stored provisionally and the source has since revised comes back as a correction", () => {
+  const history = [stored("21:00", 17.66), stored("22:00", 17.56), stored("23:00", 12.03, 237.64)];
+  const rows = [gr("21:00", 17.66), gr("22:00", 17.56), gr("23:00", 17.57)];
+  assert.deepEqual(correctedGraphRows(history, rows).map((r) => [r.updatedAt, r.levelMsl, r.dischargeM3s]), [["2026-10-01T23:00:00+07:00", 17.57, null]]);
+});
+
+test("correctedGraphRows: K.63's old 08:00 dip is corrected too, with its discharge, not only the newest hour", () => {
+  const history = [stored("07:00", 17.55, 2227.48), stored("08:00", 14.81, 1238.25), stored("09:00", 17.47, 2195.11)];
+  const rows = [gr("07:00", 17.55, 2227.48), gr("08:00", 17.51, 2211.3), gr("09:00", 17.47, 2195.11)];
+  const c = correctedGraphRows(history, rows);
+  assert.deepEqual(c.map((r) => [r.updatedAt.slice(11, 16), r.levelMsl, r.dischargeM3s]), [["08:00", 17.51, 2211.3]]);
+});
+
+test("correctedGraphRows: nothing changed means nothing to correct, and a correction is not repeated on the next run", () => {
+  const history = [stored("22:00", 17.56), stored("23:00", 12.03)];
+  assert.deepEqual(correctedGraphRows(history, [gr("22:00", 17.56), gr("23:00", 12.03)]), []);
+  // the correction is in History now (same source time, later row): the revised value is what we hold
+  const after = [...history, { ...stored("23:00", 17.57, null, "2026-10-02T00:30:00Z") }];
+  assert.deepEqual(correctedGraphRows(after, [gr("22:00", 17.56), gr("23:00", 17.57)]), []);
+});
+
+test("correctedGraphRows: only hours we already hold are corrected; new hours are newGraphRows' job, gaps stay gaps", () => {
+  const history = [stored("22:00", 17.56)];
+  assert.deepEqual(correctedGraphRows(history, [gr("20:00", 17.7), gr("22:00", 17.56), gr("23:00", 17.57)]), []);
+  assert.deepEqual(correctedGraphRows([], [gr("22:00", 17.56)]), []);
+});
+
+test("correctedGraphRows: source rounding is not a revision (level to 0.01 m, discharge to 1 m3/s)", () => {
+  assert.equal(correctedGraphRows([stored("23:00", 17.57)], [gr("23:00", 17.570000000000004)]).length, 0);
+  assert.equal(correctedGraphRows([stored("09:00", 17.47, 2195.11499)], [gr("09:00", 17.47, 2195.110107)]).length, 0); // K.63's real 09:00
+  assert.equal(correctedGraphRows([stored("09:00", 17.47, 2195)], [gr("09:00", 17.47, 2210)]).length, 1);
+  assert.equal(correctedGraphRows([stored("09:00", 17.47)], [gr("09:00", 17.48)]).length, 1);
+});
+
+test("correctedGraphRows: a discharge that merely appears where we held none is an addition, not a revision (K.58's old rows)", () => {
+  assert.equal(correctedGraphRows([stored("01:00", 50.19)], [gr("01:00", 50.19, 1233.5)]).length, 0);
+  assert.equal(correctedGraphRows([stored("01:00", 50.19, 1233.5)], [gr("01:00", 50.19, null)]).length, 0);
+});
+
+test("correctedGraphRows: the provisional discharge that vanishes with a revised level is still corrected (K.11A 23:00)", () => {
+  const c = correctedGraphRows([stored("23:00", 12.03, 237.64)], [gr("23:00", 17.57, null)]);
+  assert.deepEqual(c.map((r) => [r.levelMsl, r.dischargeM3s]), [[17.57, null]]);
+});
+
+test("suspectLatest: a correction row (same source time as the one before) is judged as the revised value, not as a step", () => {
+  const rows = [lv("21:00", 17.66), lv("22:00", 17.56), lv("23:00", 12.03), lv("23:00", 17.57)];
+  assert.equal(suspectLatest(rows), null);
+  // and a provisional reading that has NOT been revised yet is still suspect
+  assert.ok(suspectLatest(rows.slice(0, 3)));
+});
+
+test("newGraphRows: a correction row at the end of the file (an older hour) does not make every later hour look new again", () => {
+  const history = [stored("22:00", 17.56), stored("23:00", 12.03), stored("08:00", 17.51, null, "2026-10-02T00:30:00Z")]; // 08:00 corrected last
+  history[2].updatedAt = "2026-10-01T08:00:00+07:00";
+  const rows = [gr("08:00", 17.51), gr("22:00", 17.56), gr("23:00", 12.03), gr("23:30", 12.1)];
+  assert.deepEqual(newGraphRows(history, rows).map((r) => r.updatedAt.slice(11, 16)), ["23:30"]);
+});
+
+test("currentReadings: one row per source time (the revision wins), oldest first, input untouched", () => {
+  const rows = [stored("22:00", 17.56), stored("23:00", 12.03, 237.64), stored("08:00", 17.51), stored("23:00", 17.57, null, "2026-10-02T00:30:00Z")];
+  const cur = currentReadings(rows);
+  assert.deepEqual(cur.map((r) => r.updatedAt.slice(11, 16) + "=" + r.levelMsl), ["08:00=17.51", "22:00=17.56", "23:00=17.57"]);
+  assert.equal(rows[0].updatedAt.slice(11, 16), "22:00");
+  assert.equal(rows.length, 4);
+});
+
+test("currentReadings: the provisional discharge does not survive its revision (K.11A showed 238 m3/s after the fix)", () => {
+  const cur = currentReadings([stored("23:00", 12.03, 237.64), stored("23:00", 17.57, null, "2026-10-02T00:30:00Z")]);
+  assert.equal(cur.length, 1);
+  assert.equal(cur[0].dischargeM3s, undefined);
+});
+
+test("currentReadings: rows with no readable source time are dropped, not guessed", () => {
+  assert.deepEqual(currentReadings([{ levelMsl: 1 }, { updatedAt: "nope", levelMsl: 2 }]), []);
 });

@@ -24,6 +24,7 @@ const {
   isSameReading,
   parseWaterLevelGraph,
   newGraphRows,
+  correctedGraphRows,
   parseEgatChannelCapacity,
   graphStationsForSource,
   bangkokDate,
@@ -261,13 +262,17 @@ const scrapeGraphSource = (source) => async function (scrapedAt) {
         const { rows: allRows, bankMsl } = parseWaterLevelGraph(raw);
         const rows = allRows.filter((r) => !isFutureReading(r.updatedAt, nowMs));
         if (!rows.length) throw missing(`station ${id} returned no readings`);
-        const fresh = newGraphRows(readJson(file, []), rows).map((r) => {
+        const history = readJson(file, []);
+        const toRow = (r) => {
           const row = { scrapedAt, updatedAt: r.updatedAt, levelMsl: r.levelMsl, bankMsl };
           if (r.dischargeM3s != null) row.dischargeM3s = r.dischargeM3s;
           return row;
-        });
-        const added = appendRows(file, fresh);
-        return `appended ${added} of ${rows.length} rows, newest ${rows[rows.length - 1].updatedAt}`;
+        };
+        // Corrections first (hours the source has since revised), then the hours newer than any we hold.
+        const corrections = correctedGraphRows(history, rows).map(toRow);
+        const fresh = newGraphRows(history, rows).map(toRow);
+        const added = appendRows(file, [...corrections, ...fresh]);
+        return `appended ${added} of ${rows.length} rows (${corrections.length} corrected), newest ${rows[rows.length - 1].updatedAt}`;
       }),
     );
   }

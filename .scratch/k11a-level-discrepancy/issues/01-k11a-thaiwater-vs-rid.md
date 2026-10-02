@@ -1,6 +1,6 @@
 # 01: K.11A level: ThaiWater and RID disagree
 
-Status: root-cause-found
+Status: done
 
 **Found:** 2026-10-01, while researching the lower Mae Klong (`.scratch/maeklong-photharam-water-monitor/research/lower-mae-klong-riverline.md`, "Avoid"). Deliberately kept out of the lower-riverline work.
 
@@ -42,3 +42,7 @@ Our stored History still holds the provisional values, because `newGraphRows` ap
 Effects: charts and trends keep a dip the source no longer reports, and the K.63 dip at 08:00 is permanently in History.
 
 Options (not done, needs a decision because History is append-only): (a) each run also re-reads the last few stored hours, and when the source's value for an hour differs, append a corrected row with the same `updatedAt` (the page already lets the later row win per source time, `seriesOf`), keeping the provisional one in the log; (b) leave it and rely on the display guard (`suspectLatest`), which only hides the newest hour. The same rule would apply to K.2B, K.57, K.55A, the Barrage (all graph-fed).
+
+### 2026-10-02 fix (maintainer approved option a)
+
+`correctedGraphRows` (parse.js) returns hours we already hold whose level the source now states differently (over 0.01 m, or both discharges over 1 m3/s apart); the Collector appends them as rows with the same `updatedAt`, then the new hours. A discharge that only appears or disappears with the same level is not a revision (K.58's old rows gained a discharge; that is an addition, left alone). `newGraphRows` now takes the newest source time held, wherever it sits in the file, so a correction row for an older hour does not make later hours look new. Readers use `currentReadings` (one row per source time, the later winning, sorted), so the page never shows a provisional value or its discharge once it is revised. Live run on a scratch copy: exactly two corrections (K.11A 23:00 12.03 -> 17.57, K.63 08:00 14.81 -> 17.51), none on other gauges, and a second run added nothing. The display guard stays for the newest, not-yet-revised hour.
