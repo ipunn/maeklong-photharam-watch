@@ -675,5 +675,26 @@
     "levelMsl": 9.23,
     "bankMsl": 9,
     "dischargeM3s": 1702.449951
+  },
+  {
+    "scrapedAt": "2026-10-03T01:16:15.472Z",
+    "updatedAt": "2026-10-03T05:00:00+07:00",
+    "levelMsl": 9.22,
+    "bankMsl": 9,
+    "dischargeM3s": 1699.300049
+  },
+  {
+    "scrapedAt": "2026-10-03T01:16:15.472Z",
+    "updatedAt": "2026-10-03T06:00:00+07:00",
+    "levelMsl": 9.21,
+    "bankMsl": 9,
+    "dischargeM3s": 1696.150024
+  },
+  {
+    "scrapedAt": "2026-10-03T01:16:15.472Z",
+    "updatedAt": "2026-10-03T07:00:00+07:00",
+    "levelMsl": 9.2,
+    "bankMsl": 9,
+    "dischargeM3s": 1693
   }
 ]
