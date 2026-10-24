@@ -3939,5 +3939,12 @@
     "levelMsl": 43.69,
     "bankMsl": 45.8,
     "dischargeM3s": 360.799988
+  },
+  {
+    "scrapedAt": "2026-10-24T14:42:07.550Z",
+    "updatedAt": "2026-10-24T21:00:00+07:00",
+    "levelMsl": 43.63,
+    "bankMsl": 45.8,
+    "dischargeM3s": 353.600006
   }
 ]
