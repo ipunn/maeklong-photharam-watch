@@ -17225,5 +17225,12 @@
     "levelMsl": 1.52,
     "bankMsl": 2.5,
     "status": null
+  },
+  {
+    "scrapedAt": "2026-10-24T18:04:44.754Z",
+    "updatedAt": "2026-10-25T00:50:00+07:00",
+    "levelMsl": 1.51,
+    "bankMsl": 2.5,
+    "status": null
   }
 ]
