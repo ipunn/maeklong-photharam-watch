@@ -6100,5 +6100,14 @@
     "inflowMcm": 0.89,
     "releaseMcm": 0.85,
     "releaseM3s": 236
+  },
+  {
+    "scrapedAt": "2026-10-31T05:02:38.683Z",
+    "reportedAt": "2026-10-31T11:00:00+07:00",
+    "levelMsl": 179.25,
+    "storageMcm": 17432.12,
+    "inflowMcm": 0.92,
+    "releaseMcm": 0.88,
+    "releaseM3s": 244
   }
 ]
