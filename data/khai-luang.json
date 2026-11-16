@@ -7443,5 +7443,40 @@
     "levelMsl": 3.65,
     "bankMsl": 9,
     "dischargeM3s": 357.25
+  },
+  {
+    "scrapedAt": "2026-11-16T22:41:47.602Z",
+    "updatedAt": "2026-11-17T01:00:00+07:00",
+    "levelMsl": 3.62,
+    "bankMsl": 9,
+    "dischargeM3s": 352.299988
+  },
+  {
+    "scrapedAt": "2026-11-16T22:41:47.602Z",
+    "updatedAt": "2026-11-17T02:00:00+07:00",
+    "levelMsl": 3.59,
+    "bankMsl": 9,
+    "dischargeM3s": 347.350006
+  },
+  {
+    "scrapedAt": "2026-11-16T22:41:47.602Z",
+    "updatedAt": "2026-11-17T03:00:00+07:00",
+    "levelMsl": 3.55,
+    "bankMsl": 9,
+    "dischargeM3s": 340.75
+  },
+  {
+    "scrapedAt": "2026-11-16T22:41:47.602Z",
+    "updatedAt": "2026-11-17T04:00:00+07:00",
+    "levelMsl": 3.48,
+    "bankMsl": 9,
+    "dischargeM3s": 329.200012
+  },
+  {
+    "scrapedAt": "2026-11-16T22:41:47.602Z",
+    "updatedAt": "2026-11-17T05:00:00+07:00",
+    "levelMsl": 3.41,
+    "bankMsl": 9,
+    "dischargeM3s": 317.649994
   }
 ]
