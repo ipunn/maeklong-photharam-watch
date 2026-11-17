@@ -488,5 +488,13 @@
     "storagePercent": 96.06,
     "levelMsl": 154.09,
     "releaseRateM3s": 139.47
+  },
+  {
+    "scrapedAt": "2026-11-17T00:02:37.198Z",
+    "reportedAt": "2026-11-17T00:00:00+07:00",
+    "storageMcm": 8511,
+    "storagePercent": 96.06,
+    "levelMsl": 154.09,
+    "releaseRateM3s": 138.43
   }
 ]
