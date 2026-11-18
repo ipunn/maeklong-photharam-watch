@@ -8564,5 +8564,13 @@
     "bankMsl": 16.34,
     "status": null,
     "dischargeM3s": 350
+  },
+  {
+    "scrapedAt": "2026-11-18T16:59:30.091Z",
+    "updatedAt": "2026-11-18T23:00:00+07:00",
+    "levelMsl": 7.63,
+    "bankMsl": 16.34,
+    "status": null,
+    "dischargeM3s": 350
   }
 ]
